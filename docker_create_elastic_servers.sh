@@ -60,15 +60,17 @@ printf "wait for the end of the install .."
 ES_ADMIN_PASS=""
 while [ -z "${ES_ADMIN_PASS}" ]
 do
-    ES_ADMIN_PASS=`docker exec -it $CONTAINER_ES_NAME bin/elasticsearch-reset-password -u elastic -b  | grep "New value" | cut -d ":" -f 2`
+    ES_ADMIN_PASS=`docker exec -it $CONTAINER_ES_NAME bin/elasticsearch-reset-password -u elastic -b  | grep "New value" | cut -d ":" -f 2 |sed 's/ //g'|sed 's/ //g'`
     printf ".."
 done
+#ES_ADMIN_PASS=`echo "${ES_ADMIN_PASS//[$'\t\r\n ']}"`
+
 printf "done\n"
 echo "--> USER=elastic"
 echo "--> PASSWORD=$ES_ADMIN_PASS"
-echo "user=\"elastic\"">> $CONFIG_FILE
-echo "password=\"$ES_ADMIN_PASS\"">> $CONFIG_FILE
-echo "index_name=\"lora-index\"">> $CONFIG_FILE
+echo "user=\"elastic\"" >> $CONFIG_FILE
+echo "password=\"${ES_ADMIN_PASS//[$'\t\r\n ']}\"" >> $CONFIG_FILE
+echo "index_name=\"lora-index\"" >> $CONFIG_FILE
 #Enrollment key for elastic search
 ES_ENROL_KEY=""
 while [ -z "${ES_ENROL_KEY}" ]
@@ -76,7 +78,7 @@ do
     ES_ENROL_KEY=`docker exec -it $CONTAINER_ES_NAME bin/elasticsearch-create-enrollment-token --scope kibana`
 done
 echo "--> ENROL_KEY=$ES_ENROL_KEY"
-echo "enroll_key=\"$ES_ENROL_KEY\"">> $CONFIG_FILE
+echo "enroll_key=\"${ES_ENROL_KEY//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 
 # Verification code for Kibana
 KIB_CODE_VERIF=""
@@ -85,8 +87,11 @@ do
     KIB_CODE_VERIF=`docker exec -it $CONTAINER_KIB_NAME bin/kibana-verification-code | grep "verification code"| cut -d ":" -f 2`
 done
 echo "--> VERIF_CODE=$KIB_CODE_VERIF"
-echo "verif_code=\"$KIB_CODE_VERIF\"" >> $CONFIG_FILE
+echo "verif_code=\"${KIB_CODE_VERIF//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 echo ""
+
+
+
 
 echo "Use now your browser to open http://localhost:5601/ with the credentials above"
 echo "docker exec -it $CONTAINER_KIB_NAME bin/kibana-verification-code"
