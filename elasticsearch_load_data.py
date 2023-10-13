@@ -50,3 +50,7 @@ for filename in os.listdir(DIR):
             if (i % 1000 == 0):
                 print(i)
         os.remove(os.path.join(DIR, filename_json))
+
+
+# refresh the index
+clientES.indices.refresh(index=myconfig.index_name)
