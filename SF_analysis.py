@@ -2,6 +2,9 @@ from datetime import datetime
 from elasticsearch import Elasticsearch
 import requests, json, os, tarfile, pathlib
 import myconfig
+import pandas as pd
+
+
 
 #number of results for a query
 QUERY_NB_RESULT=10000
@@ -18,60 +21,64 @@ clientES = Elasticsearch(
 #create a PIT to fix the index for the search query
 result = clientES.open_point_in_time(index=myconfig.index_name, keep_alive="1m")
 pit_id = result['id']
-print(pit_id)
+print("ID of the elastic search connection for the query: ", pit_id)
 
 
-# list of clients with SF=12
-datemin="0"
-i=0
-while True:
-    
-    resp = clientES.search(
-        size=QUERY_NB_RESULT,
-        query={
-            "bool": {
-                "filter": [
-                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
-                    {"term": {"txInfo.loRaModulationInfo.spreadingFactor": "12"}},
-                ],
+
+
+# list of clients with specific SF
+numRecords = pd.Series()
+for SF in range(7,12):
+
+    #initialization with an empty value for this SF
+    if SF not in numRecords.index:
+        numRecords = pd.concat([numRecords, pd.Series(data=[0], index=[SF])])
+
+    # initially, the first date in the range is nothing (=0)
+    datemin="0"
+    while True:
+        
+        resp = clientES.search(
+            size=QUERY_NB_RESULT,
+            query={
+                "bool": {
+                    "filter": [
+                        {"match": {"rxInfo.crcStatus": "CRC_OK"}},
+                        {"term": {"txInfo.loRaModulationInfo.spreadingFactor": SF}},
+                    ],
+                },
             },
-        },
-        pit={
-            "id": pit_id,
-            "keep_alive": "1m",
-        },
-        sort=[
-            {"mqtt_time": {"order": "asc"}},
-            {"_score": {"order": "desc"}},
-        ],
-        search_after=[
-            datemin,
-            0
-        ],
-    )
+            pit={
+                "id": pit_id,
+                "keep_alive": "1m",
+            },
+            sort=[
+                {"mqtt_time": {"order": "asc"}},
+                {"_score": {"order": "desc"}},
+            ],
+            search_after=[
+                datemin,
+                0
+            ],
+        )
+        
+        #metadata of the response
+        length = len(resp['hits']['hits'])
+        numRecords[SF] = numRecords[SF] + length
+        #print("Got %d Hits:" % length)
+         
+        #stops if we have less than QUERY_SIZE elements
+        if (length < QUERY_NB_RESULT):
+            break
+
+        #extracts the mqtt-time of the last element for the next query
+        datemin = resp['hits']['hits'][length-1]['_source']['mqtt_time']
+         
+
+#final results
+print(numRecords)
+
     
-    #metadata of the response
-    print("Got %d Hits:" % resp['hits']['total']['value'])
-    length = len(resp['hits']['hits'])
-
-   
-    #extracts the mqtt-time of the last element
-    datemin = resp['hits']['hits'][length-1]['_source']['mqtt_time']
-    print(datemin, "", i)
-    i=i+length
-    
-    #stops if we have less than QUERY_SIZE elements
-    if (length < QUERY_NB_RESULT):
-        break
-   
-
-    
-    #for hit in resp['hits']['hits']:
-    #    print(hit['_source']['mqtt_time'])
-    #    if (hit['_source']['mqtt_time'] > datemin):
-    #        datemin = hit['_source']['mqtt_time']
-
-
 
 
 #delete the PIT
