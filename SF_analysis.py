@@ -63,7 +63,6 @@ resp = clientES.search(
 # get source data from document
 print(resp["aggregations"]["SF"])
 
-
 #for elem in source_data["SF"]["buckets"]:
 #    print(elem)
 
@@ -73,21 +72,30 @@ print("------------")
 
 
 # iterate source data (use iteritems() for Python 2)
-fields = {}
-for key in resp["aggregations"]["SF"]["buckets"]:
-    print(key)
-    if False:
-        try:
-            print(key, "///", val)
-            fields[key] = np.append(fields[key], val)
-        except KeyError:
-            print(key, "//", val)
-            fields[key] = np.array([val])
-
-    print("       ")
+results = pd.DataFrame()
+for SF in resp["aggregations"]["SF"]["buckets"]:
+    print("! SF=", SF["key"])
+    nb_total = SF["doc_count"]
+    nb_total_bis = 0
+    
+    
+    for channels in SF["channels"]["buckets"]:
+        print("   >", channels["key"], "=", channels["doc_count"])
+        nb_total_bis += channels["doc_count"]
+        
+        #create the index if it doesn't exit
+        #if SF["key"] not in results.index.values:
+        print(results)
+        print("'''")
+        results[SF["key"]]=[100]
+ 
+    
+    
+    
+    print("       ", nb_total, " =?= ", nb_total_bis)
 
 print("------------")
-print(fields)
+print(results)
 
 #delete the PIT
 clientES.close_point_in_time(id=pit_id)
