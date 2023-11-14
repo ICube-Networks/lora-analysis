@@ -1,10 +1,17 @@
-from datetime import datetime
+# elastic search for the queries
 from elasticsearch import Elasticsearch
-import requests, json, os, tarfile, pathlib
-import myconfig
-import pandas as pd
 
-from elasticsearch_dsl import Search
+# format
+import requests, json, os, tarfile, pathlib
+from datetime import datetime
+
+# configuration parameters
+import myconfig
+
+# numerical libraries
+import pandas as pd
+import numpy as np
+
 
 #number of results for a query
 QUERY_NB_RESULT=10000
@@ -25,111 +32,64 @@ print("ID of the elastic search connection for the query: ", pit_id)
 
 
 
-if True:
-
-    # list of clients with specific SF
-    numRecords = pd.Series()
-    for SF in range(7,12):
-
-        #initialization with an empty value for this SF
-        if SF not in numRecords.index:
-            numRecords = pd.concat([numRecords, pd.Series(data=[0], index=[SF])])
-
-        # initially, the first date in the range is nothing (=0)
-        datemin="0"
-        while True:
-            
-            resp = clientES.search(
-                size=QUERY_NB_RESULT,
-                query={
-                    "bool": {
-                        "filter": [
-                            {"match": {"rxInfo.crcStatus": "CRC_OK"}},
-                            {"term": {"txInfo.loRaModulationInfo.spreadingFactor": SF}},
-                        ],
-                    },
-                },
-                pit={
-                    "id": pit_id,
-                    "keep_alive": "1m",
-                },
-                sort=[
-                    {"mqtt_time": {"order": "asc"}},
-                    {"_score": {"order": "desc"}},
-                ],
-                search_after=[
-                    datemin,
-                    0
-                ],
-            )
-            
-            #metadata of the response
-            length = len(resp['hits']['hits'])
-            numRecords[SF] = numRecords[SF] + length
-            #print("Got %d Hits:" % length)
-             
-            #stops if we have less than QUERY_SIZE elements
-            if (length < QUERY_NB_RESULT):
-                break
-
-            #extracts the mqtt-time of the last element for the next query
-            datemin = resp['hits']['hits'][length-1]['_source']['mqtt_time']
-             
-
-    #final results
-    print(numRecords)
-
     
 
+# list of clients with specific SF
+numRecords = pd.Series()
     
-    
-    
-if True:
-
-    # list of clients with specific SF
-    numRecords = pd.Series()
-
-    # initially, the first date in the range is nothing (=0)
-    datemin="0"
-
-            
-    resp = clientES.search(
-        size=0,
-        query={
+resp = clientES.search(
+    size=0,
+    body={
+        "query":{
             "bool": {
                 "filter": [
-                    {"match": {"rxInfo.crcStatus": "CRC_OK"}} #,
-                  #  {"term": {"txInfo.loRaModulationInfo.spreadingFactor": SF}},
+                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
                 ],
             },
         },
-        aggs={
-            "toto": { "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" }},
-            
+        "aggregations": {
+            "SF": {
+                "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" },
+                "aggregations": {
+                    "channels": { "terms" : { "field" : "rxInfo.channel" }},
+                },
+            },
         },
-        pit={
-            "id": pit_id,
-            "keep_alive": "1m",
-        },
-        sort=[
-            {"mqtt_time": {"order": "asc"}},
-            {"_score": {"order": "desc"}},
-        ],
-        search_after=[
-            datemin,
-            0
-        ],
-    )
+     }
+)
     
-    print(resp)
-            
+#"dates" : A("date_histogram", field="date", interval="1M", time_zone="Europe/Berlin"),
+   
           
           
+# get source data from document
+print(resp["aggregations"]["SF"])
 
-    
- 
+
+#for elem in source_data["SF"]["buckets"]:
+#    print(elem)
+
+print("------------")
+print("------------")
 
 
+
+# iterate source data (use iteritems() for Python 2)
+fields = {}
+for key in resp["aggregations"]["SF"]["buckets"]:
+    print(key)
+    if False:
+        try:
+            print(key, "///", val)
+            fields[key] = np.append(fields[key], val)
+        except KeyError:
+            print(key, "//", val)
+            fields[key] = np.array([val])
+
+    print("       ")
+
+print("------------")
+print(fields)
 
 #delete the PIT
 clientES.close_point_in_time(id=pit_id)
