@@ -39,20 +39,18 @@ numRecords = pd.Series()
     
 resp = clientES.search(
     size=0,
-    body={
-        "query":{
-            "bool": {
-                "filter": [
-                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
-                ],
-            },
+    query={
+        "bool": {
+            "filter": [
+                {"match": {"rxInfo.crcStatus": "CRC_OK"}},
+            ],
         },
-        "aggregations": {
-            "SF": {
-                "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" },
-                "aggregations": {
-                    "channels": { "terms" : { "field" : "rxInfo.channel" }},
-                },
+    },
+    aggs={
+        "SF": {
+            "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" },
+            "aggregations": {
+                "channels": { "terms" : { "field" : "rxInfo.channel" }},
             },
         },
      }
