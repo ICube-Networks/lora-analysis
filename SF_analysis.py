@@ -13,30 +13,56 @@ import pandas as pd
 import numpy as np
 
 
-#number of results for a query
-QUERY_NB_RESULT=10000
+# transform an elastic search reply to an agg query into a pandas dataframe
+def elasticsearch_reply_into_dataframe(es_reply, row_name, col_name, debug):
+    results_df = pd.DataFrame()
+    for row_df in es_reply["aggregations"][row_name]["buckets"]:
+        nb_total = row_df["doc_count"]
+        nb_total_bis = 0
+        
+        #the row does not exist -> add an empty column
+        if row_df["key"] not in results_df.index:
+            if debug:
+                print("the row ", row_df["key"], " does not exist")
+            results_df.loc[row_df["key"], :] = [0] * len(results_df.columns)
+        
+        for col_df in row_df[col_name]["buckets"]:
+            #create the column if it doesn't exit
+            if col_df["key"] not in results_df.columns:
+                if debug:
+                    print("the col ", col_df["key"] , " does not exist")
+                results_df.insert(0, col_df["key"] ,  [0] * len(results_df) , True)
+
+            #store the current value in the corresponding cell of the dataframe
+            if debug:
+                print("   >", col_df["key"], "=", col_df["doc_count"])
+            nb_total_bis += col_df["doc_count"]
+            results_df.loc[[row_df["key"]],[col_df["key"]]] = col_df["doc_count"]
+            
+        
+        
+        if debug:
+            print("       ", nb_total, " =?= ", nb_total_bis)
+
+    if debug:
+        print("------------")
+
+    return(results_df)
+
 
 
 #elastic connection
+DEBUG_ES = False
 clientES = Elasticsearch(
     "https://localhost:9200",
     verify_certs=False,
     ssl_show_warn=False,
     basic_auth=(myconfig.user, myconfig.password)
 )
-
-#create a PIT to fix the index for the search query
-result = clientES.open_point_in_time(index=myconfig.index_name, keep_alive="1m")
-pit_id = result['id']
-print("ID of the elastic search connection for the query: ", pit_id)
-
-
-
     
 
-# list of clients with specific SF
+# get the number of valid records per SF per channel
 numRecords = pd.Series()
-    
 resp = clientES.search(
     size=0,
     query={
@@ -58,44 +84,18 @@ resp = clientES.search(
     
 #"dates" : A("date_histogram", field="date", interval="1M", time_zone="Europe/Berlin"),
    
-          
+        
           
 # get source data from document
-print(resp["aggregations"]["SF"])
-
-#for elem in source_data["SF"]["buckets"]:
-#    print(elem)
-
-print("------------")
-print("------------")
+if DEBUG_ES:
+    print(resp["aggregations"]["SF"])
+    print("------------")
 
 
+# transform the aggregation results into a pandas' dataframe
+results_df = elasticsearch_reply_into_dataframe(es_reply= resp, row_name="SF", col_name="channels", debug=False, )
+print(results_df)
 
-# iterate source data (use iteritems() for Python 2)
-results = pd.DataFrame()
-for SF in resp["aggregations"]["SF"]["buckets"]:
-    print("! SF=", SF["key"])
-    nb_total = SF["doc_count"]
-    nb_total_bis = 0
-    
-    
-    for channels in SF["channels"]["buckets"]:
-        print("   >", channels["key"], "=", channels["doc_count"])
-        nb_total_bis += channels["doc_count"]
-        
-        #create the index if it doesn't exit
-        #if SF["key"] not in results.index.values:
-        print(results)
-        print("'''")
-        results[SF["key"]]=[100]
- 
-    
-    
-    
-    print("       ", nb_total, " =?= ", nb_total_bis)
-
-print("------------")
-print(results)
 
 #delete the PIT
 clientES.close_point_in_time(id=pit_id)
