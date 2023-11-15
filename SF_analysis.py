@@ -11,6 +11,7 @@ import myconfig
 # numerical libraries
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 # transform an elastic search reply to an agg query into a pandas dataframe
@@ -76,29 +77,35 @@ resp = clientES.search(
         "SF": {
             "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" },
             "aggregations": {
-                "channels": { "terms" : { "field" : "rxInfo.channel" }},
+                 "date": { "date_histogram" : { "field" : "rxInfo.time", "calendar_interval": "day", "time_zone": "Europe/Paris" }},
+                # "channels": { "terms" : { "field" : "rxInfo.channel" }},
             },
         },
      }
 )
-    
-#"dates" : A("date_histogram", field="date", interval="1M", time_zone="Europe/Berlin"),
-   
         
-          
-# get source data from document
+# print
 if DEBUG_ES:
     print(resp["aggregations"]["SF"])
     print("------------")
 
 
 # transform the aggregation results into a pandas' dataframe
-results_df = elasticsearch_reply_into_dataframe(es_reply= resp, row_name="SF", col_name="channels", debug=False, )
+results_df = elasticsearch_reply_into_dataframe(es_reply= resp, row_name="SF", col_name="date", debug=False, )
 print(results_df)
 
 
-#delete the PIT
-clientES.close_point_in_time(id=pit_id)
+#plot
+fig, ax = plt.subplots()
+for SF in results_df.index:
+    x = results_df.columns
+    y = results_df.loc[SF]
+    ax.plot(x, y, label=SF)
 
+ax.legend()
+ax.set(xlabel='time (s)', ylabel='Nb packets',
+           title='Number of packets in the dataset')
+ax.grid()
 
-    
+fig.savefig("test.pdf")
+#plt.show()
