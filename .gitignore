@@ -166,4 +166,10 @@ myconfig.py
 dataset/*
 data/*
 
+# node js installation
+node_modules/*
+package-lock.json
+package.json
+
+
 test.pdf
