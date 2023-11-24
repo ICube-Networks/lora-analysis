@@ -50,5 +50,26 @@ def elasticsearch_reply_into_dataframe(es_reply, row_name, col_name, debug):
 
 
 
+############################################################
+#           Day of the week (string) -> int
+############################################################
 
-
+def day_of_week_int(day):
+    match day:
+        case "Monday":
+            return 1
+        case "Tuesday":
+            return 2
+        case "Wednesday":
+            return 3
+        case "Thursday":
+            return 4
+        case "Friday":
+            return 5
+        case "Saturday":
+            return 6
+        case "Sunday":
+            return 7
+        case _:
+            return 8
+        

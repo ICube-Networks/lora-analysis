@@ -17,6 +17,8 @@ import requests, json, os, tarfile, pathlib
 from datetime import datetime
 
 
+
+
 #elastic connection
 DEBUG_ES = False
 clientES = Elasticsearch(
@@ -46,7 +48,7 @@ resp = clientES.options(
                     "range":{
                         "mqtt_time":{
                              "gte": "2020-09-01",
-                             "lte": "2020-10-30",
+                             #"lte": "2020-10-30",
                              "format": "year_month_day",
                         }
                     }
@@ -65,8 +67,10 @@ resp = clientES.options(
 # transform the aggregation results into a pandas' dataframe
 results_df = pd.Series()
 for col_df in resp["aggregations"]["day_of_week"]["buckets"]:
-    results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[col_df["key"]] ))
+    results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[tools.day_of_week_int(col_df["key"])] ))
 
+results_df = results_df.sort_index()
+    
 if True:
     print("------------")
     print(results_df.index.to_numpy)
@@ -80,8 +84,8 @@ if True:
 #plot
 fig, ax = plt.subplots()
 ax.plot(results_df.index, results_df.values)
-ax.legend()
 ax.set(xlabel='day of the week', ylabel='Number of packets', title='Distribution of the traffic in the week')
+ax.set_ylim(bottom=0)
 ax.grid()
 fig.savefig("figures/traffic_per_day_of_week.pdf")
 #plt.show()
