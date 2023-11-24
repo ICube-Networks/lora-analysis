@@ -59,20 +59,25 @@ do
     filename_json="`echo "$filename_targz" | rev | cut -d '.' -f 3- | rev`"
 
     #decompress the file
-    tar -xzf $filename_targz
+    tar -xzf $filename_targz -C ${DIR_DUMPS}
     
     
     echo "
     NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
-            --output=http://${USER}:${PASSWORD}@${IP_ADDR}:9200/$INDEX_NAME \
+--output=https://${USER}:${PASSWORD}@${IP_ADDR}:9200/$INDEX_NAME \
+--input=${filename_json} \
+--type=data --limit=10000
+       "
+    #exit 2
+    NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
+            --output=https://${USER}:${PASSWORD}@${IP_ADDR}:9200/$INDEX_NAME \
             --input=${filename_json} \
             --type=data --limit=10000
-       "
-    exit 2
-     NODE_TLS_REJECT_UNAUTHORIZED=0 ./node_modules/elasticdump/bin/elasticdump             --output=http://elastic:xVeaS2Pw0xVWkvW1yBfo@127.0.0.1:9200/lora-index             --input=/Users/theoleyre/Seafile/documents-laptop/recherche/tools/lora-analysis/data/lora_gateway_rx_v3_data_2020-10.json             --type=data --limit=10000
+
      
-     
-        NODE_TLS_REJECT_UNAUTHORIZED=0   /Users/theoleyre/Seafile/documents-laptop/recherche/tools/lora-analysis/node_modules/elasticdump/bin/elasticdump --output=https://elastic:xVeaS2Pw0xVWkvW1yBfo@127.0.0.1:9200/lora-index             --input=data/lora_gateway_rx_v3_data_2020-10.json             --type=data --limit=10000 --debug=yes --cert=data/cert.cer
+    #cleaning
+    rm $filename_json
+
 done
 
 
