@@ -33,9 +33,9 @@ echo "Will store the dumps into ${DIR_RESULT}"
 
 
 # répertoire où stocker les fichiers json
-YEARS="2023"
+YEARS="2022"
 #YEARS="2020 2021 2022 2023"
-MONTHS="06 07 08 09 10 11 12"
+MONTHS="10 11"
 #MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
 
 #remove previous container in case of failure

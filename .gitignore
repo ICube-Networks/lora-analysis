@@ -163,13 +163,14 @@ cython_debug/
 myconfig.py
 
 #datasets
-dataset/*
-data/*
+install/dataset/*
+install/data/*
 
 # node js installation
 node_modules/*
 package-lock.json
 package.json
 
+#figures
+scripts/figures/*
 
-test.pdf

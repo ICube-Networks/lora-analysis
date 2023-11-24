@@ -5,7 +5,7 @@ CONTAINER_KIB_NAME="kibana-server"
 ES_VERSION="8.10.2"
 KIB_VERSION="8.10.2"
 
-CONFIG_FILE="myconfig.py"
+CONFIG_FILE="../scripts/myconfig.py"
 
 #remove the previous image if one exists
 echo "*******************************************"

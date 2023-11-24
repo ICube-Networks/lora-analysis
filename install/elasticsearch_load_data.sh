@@ -19,9 +19,9 @@ if [ -z "${DIR_DUMPS}" ]; then
 fi
 
 #extract the parameters from the python file
-INDEX_NAME=`cat myconfig.py | grep "index_name" | cut -d '"' -f 2`
-USER=`cat myconfig.py | grep "user" | cut -d '"' -f 2`
-PASSWORD=`cat myconfig.py | grep "password" | cut -d '"' -f 2`
+INDEX_NAME=`cat ../scripts/myconfig.py | grep "index_name" | cut -d '"' -f 2`
+USER=`cat ../scriptsmyconfig.py | grep "user" | cut -d '"' -f 2`
+PASSWORD=`cat ../scriptsmyconfig.py | grep "password" | cut -d '"' -f 2`
 
 #npm verification
 if ! npm -v &> /dev/null
