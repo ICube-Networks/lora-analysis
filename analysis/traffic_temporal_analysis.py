@@ -67,7 +67,7 @@ def plot_traffic_per_dayofweek(clientES):
         results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[tools.longdayofweek_to_int(col_df["key"])] ))
     results_df = results_df.sort_index()
         
-    if True:
+    if False:
         print("------------")
         print(results_df.index.to_numpy)
         print("type: ", type(results_df.index.to_numpy))
@@ -123,26 +123,51 @@ def plot_traffic_per_hour(clientES):
             "hour": {
                 "type": "long",
                 "script": { "source": "emit(doc['mqtt_time'].value.getHour());" }
-               }
+            },
+            "date-day": {
+                "type": "keyword",
+                "script": { "source": "emit(doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString());" }
+            }
         },
         aggs={
-            "hour_distrib": {
+            "hour": {
                 "histogram": {
                     "field": "hour",
                     "interval": "1"
+                },
+                "aggs":{
+                    "date-day": {
+                        "terms": {
+                            "field": "date-day",
+                            "size": 1000
+                        }
+                    }
                 }
-            }
+        }
+#            "hour_distrib": {
+#                "histogram": {
+#                    "field": "hour",
+#                    "interval": "1"
+#                }
+#            }
         },
     )
-    print(resp)
+   # print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = pd.Series()
-    for col_df in resp["aggregations"]["hour_distrib"]["buckets"]:
-        results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[col_df["key"]] ))
-    results_df = results_df.sort_index()
+    results_df = tools.elasticsearch_reply_into_dataframe(es_reply= resp, row_name="hour", col_name="date-day", key_as_string=False, debug=True)
+    print(results_df)
+
+    exit(3)
+    
+    
+    
+    #results_df = pd.Series()
+    #for col_df in resp["aggregations"]["hour_distrib"]["buckets"]:
+    #    results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[col_df["key"]] ))
+    #results_df = results_df.sort_index()
  
-    if True:
+    if False:
         print("------------")
         print(results_df.index.to_numpy)
         print("type: ", type(results_df.index.to_numpy))
@@ -159,7 +184,7 @@ def plot_traffic_per_hour(clientES):
     ax.set_ylim(bottom=0)
     ax.grid()
     fig.savefig("figures/traffic_per_hour.pdf")
-    #plt.show()
+ 
 
 
 
