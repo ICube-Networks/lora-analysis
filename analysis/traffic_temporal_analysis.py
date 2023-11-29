@@ -1,3 +1,7 @@
+# import the config folder
+import sys
+sys.path.insert(1, '../config')
+
 # elastic search for the queries
 from elasticsearch import Elasticsearch
 

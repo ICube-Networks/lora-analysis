@@ -160,11 +160,10 @@ cython_debug/
 #.idea/
 
 #private files
-myconfig.py
+config/myconfig.py
 
 #datasets
-install/dataset/*
-install/data/*
+install/data*/*
 
 # node js installation
 node_modules/*
@@ -172,5 +171,5 @@ package-lock.json
 package.json
 
 #figures
-scripts/figures/*
+analysis/figures/*
 
