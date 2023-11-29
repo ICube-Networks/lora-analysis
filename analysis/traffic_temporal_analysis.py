@@ -19,6 +19,7 @@ import numpy as np
 # format
 import requests, json, os, tarfile, pathlib
 from datetime import datetime
+import matplotlib.dates as mdates
 
 
 # trafic per day of week
@@ -63,7 +64,7 @@ def plot_traffic_per_dayofweek(clientES):
     # transform the aggregation results into a pandas' dataframe
     results_df = pd.Series()
     for col_df in resp["aggregations"]["day_of_week"]["buckets"]:
-        results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[tools.day_of_week_int(col_df["key"])] ))
+        results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[tools.longdayofweek_to_int(col_df["key"])] ))
     results_df = results_df.sort_index()
         
     if True:
@@ -75,14 +76,17 @@ def plot_traffic_per_dayofweek(clientES):
         print("type: ", type(results_df.to_numpy))
         print("------------")
    
+
+   
     #plot
     fig, ax = plt.subplots()
     ax.plot(results_df.index, results_df.values)
-    ax.set(xlabel='day of the week', ylabel='Number of packets', title='Distribution of the traffic per day of the week')
+    ax.set(xlabel='Day of the week', ylabel='Number of packets')
     ax.set_ylim(bottom=0)
+    plt.xticks(results_df.index, tools.dayofweek.short[:len(tools.dayofweek.short)])
     ax.grid()
     fig.savefig("figures/traffic_per_day.pdf")
-    #plt.show()
+
 
 
 
@@ -151,7 +155,7 @@ def plot_traffic_per_hour(clientES):
     #plot
     fig, ax = plt.subplots()
     ax.plot(results_df.index, results_df.values)
-    ax.set(xlabel='day of the week', ylabel='Number of packets', title='Distribution of the traffic per hour')
+    ax.set(xlabel='Hour', ylabel='Number of packets')
     ax.set_ylim(bottom=0)
     ax.grid()
     fig.savefig("figures/traffic_per_hour.pdf")
@@ -175,6 +179,3 @@ print(clientES)
 #plot the graphs
 plot_traffic_per_dayofweek(clientES)
 plot_traffic_per_hour(clientES)
-
-
-

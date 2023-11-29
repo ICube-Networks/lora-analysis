@@ -1,7 +1,10 @@
 # numerical libraries
 import pandas as pd
+from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
 
-
+  
+            
+            
 ############################################################
 #           ES -> dataframe   (two dimensions array)
 ############################################################
@@ -54,22 +57,40 @@ def elasticsearch_reply_into_dataframe(es_reply, row_name, col_name, debug):
 #           Day of the week (string) -> int
 ############################################################
 
-def day_of_week_int(day):
-    match day:
-        case "Monday":
-            return 1
-        case "Tuesday":
-            return 2
-        case "Wednesday":
-            return 3
-        case "Thursday":
-            return 4
-        case "Friday":
-            return 5
-        case "Saturday":
-            return 6
-        case "Sunday":
-            return 7
-        case _:
-            return 8
+
+
+class dayofweek:
+     short = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+     long = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+ 
+            
+# return the string associated to a weekday id (int)
+def shortdayofweek_to_int(day):
+    for i in range(0, len(dayofweek.short)):
+        print(day, "==", dayofweek.list[i])
+        if dayofweek.short[i] == day:
+            return(i)
+      
+    raise Exception('Unknown week of day')
+
+# return the int associated to a weekday (string)
+def int_to_shortdayofweek(day):
+    if (day <0 or day>7):
+        raise Exception('Unknown week of day')
+    return(dayofweek.short[i])
         
+# return the string associated to a weekday id (int)
+def longdayofweek_to_int(day):
+    for i in range(0, len(dayofweek.long)):
+        print(day, "==", dayofweek.long[i])
+        if dayofweek.long[i] == day:
+            return(i)
+      
+    raise Exception('Unknown week of day')
+
+# return the int associated to a weekday (string)
+def int_to_longdayofweek(day):
+    if (day <0 or day>7):
+        raise Exception('Unknown week of day')
+    return(dayofweek.long[i])
+     
