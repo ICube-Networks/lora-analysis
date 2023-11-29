@@ -19,7 +19,7 @@ import numpy as np
 # format
 import requests, json, os, tarfile, pathlib
 from datetime import datetime
-
+import matplotlib.dates as mdates
 
 ############################################################
 #           CONNECTION TO ES SERVER
@@ -46,7 +46,7 @@ print(clientES)
 
 #get the number of valid records per SF per channel
 resp = clientES.options(
-    basic_auth=(myconfig.user, myconfig.password)
+    basic_auth=(myconfig.user, myconfig.password),
 ).search(
     index=myconfig.index_name,
     size=0,
@@ -100,10 +100,22 @@ fig, ax = plt.subplots()
 for SF in results_df.index:
     x = results_df.columns
     y = results_df.loc[SF]
-    ax.plot(x, y, label=SF)
+    ax.plot(mdates.date2num(x), y, label=SF)    # transform the date in seconds into a "real" date
+
+#labels
+ax.set(xlabel='Date', ylabel='Number of packets')
 ax.legend()
-ax.set(xlabel='time (s)', ylabel='Nb packets', title='Number of packets in the dataset')
-ax.grid()
+
+#xtics = a date
+locator = mdates.AutoDateLocator()
+formatter = mdates.ConciseDateFormatter(locator)
+ax.xaxis.set_major_locator(locator)
+ax.xaxis.set_major_formatter(formatter)
+ax.set_xlim(np.datetime64('2020-09-01'), np.datetime64('2022-02-01'))
+
+
+#final result stored in a file
 fig.savefig("figures/SF_distribution_week.pdf")
-#plt.show()
+
+
 
