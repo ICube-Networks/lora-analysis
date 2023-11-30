@@ -21,7 +21,10 @@ import requests, json, os, tarfile, pathlib
 from datetime import datetime
 import matplotlib.dates as mdates
 
-
+# Import seaborn
+import seaborn as sns
+    
+    
 # trafic per day of week
 def plot_traffic_per_dayofweek(clientES):
 
@@ -42,7 +45,7 @@ def plot_traffic_per_dayofweek(clientES):
                         "range":{
                             "mqtt_time":{
                                  "gte": "2020-09-01",
-                                 #"lte": "2020-10-30",
+                                 #"lte": "2020-12-30",
                                  "format": "year_month_day",
                             }
                         }
@@ -54,42 +57,55 @@ def plot_traffic_per_dayofweek(clientES):
             "day_of_week": {
                 "type": "keyword",
                 "script": { "source": "emit(doc['mqtt_time'].value.dayOfWeekEnum.getDisplayName(TextStyle.FULL, Locale.ROOT));" }
-               }
-        },
+            },
+            "date-day": {
+                "type": "keyword",
+                "script": {
+                "source":"emit(doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString());" }
+            }
+    },
         aggs={
-            "day_of_week": {"terms": {"field": "day_of_week"}}
+                "day_of_week": {
+      "terms": {
+        "field": "day_of_week",
+        "size": 7
+      },
+      "aggs":{
+        "date-day": {
+          "terms": {
+            "field": "date-day",
+            "size": 1000000
+          }
+        }
+      }
+    }
         },
     )
-
+    #print(resp)
+    
     # transform the aggregation results into a pandas' dataframe
-    results_df = pd.Series()
-    for col_df in resp["aggregations"]["day_of_week"]["buckets"]:
-        results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[tools.longdayofweek_to_int(col_df["key"])] ))
-    results_df = results_df.sort_index()
-        
-    if False:
-        print("------------")
-        print(results_df.index.to_numpy)
-        print("type: ", type(results_df.index.to_numpy))
-        print("------------")
-        print(results_df.to_numpy)
-        print("type: ", type(results_df.to_numpy))
-        print("------------")
-   
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("day_of_week", "date-day"), key_as_string=False, debug=False)
 
-   
-    #plot
-    fig, ax = plt.subplots()
-    ax.plot(results_df.index, results_df.values)
-    ax.set(xlabel='Day of the week', ylabel='Number of packets')
-    ax.set_ylim(bottom=0)
-    plt.xticks(results_df.index, tools.dayofweek.short[:len(tools.dayofweek.short)])
-    ax.grid()
-    fig.savefig("figures/traffic_per_day.pdf")
+    #mapping to sort with the day of week
+    results_df['day_of_week'] = pd.Categorical(results_df['day_of_week'], tools.dayofweek.long[:len(tools.dayofweek.long)])
+    results_df = results_df.sort_values('day_of_week')
 
+    #result
+    print(results_df)
 
-
-
+    # Create a seaborn visualization
+    sns.set()
+    sns.set_theme()
+    g = sns.relplot(
+        data=results_df,
+        kind="line",
+        x="day_of_week", y="count",
+    )
+    g.set(xlabel='Day of the week', ylabel='Number of packets per day')
+    g.set(ylim=(0, None))
+    g.set_xticklabels(tools.dayofweek.short[:len(tools.dayofweek.short)])
+    fig = g.figure.savefig("figures/traffic_per_dayofweek.pdf")
+    
 
 
 # trafic per hour
@@ -110,8 +126,8 @@ def plot_traffic_per_hour(clientES):
                     {
                         "range":{
                             "mqtt_time":{
-                                 "gte": "2020-09-01",
-                                 #"lte": "2020-10-30",
+                                 "gte": "2020-11-01",
+                                 #"lte": "2020-11-10",
                                  "format": "year_month_day",
                             }
                         }
@@ -133,59 +149,39 @@ def plot_traffic_per_hour(clientES):
             "hour": {
                 "histogram": {
                     "field": "hour",
-                    "interval": "1"
+                    "interval": "1",
                 },
                 "aggs":{
                     "date-day": {
                         "terms": {
                             "field": "date-day",
-                            "size": 1000
+                            "size": 1000000,
                         }
                     }
                 }
+            }
         }
-#            "hour_distrib": {
-#                "histogram": {
-#                    "field": "hour",
-#                    "interval": "1"
-#                }
-#            }
-        },
     )
    # print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_reply_into_dataframe(es_reply= resp, row_name="hour", col_name="date-day", key_as_string=False, debug=True)
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply= resp, agg_names=("hour", "date-day"), key_as_string=False, debug=False)
     print(results_df)
 
-    exit(3)
-    
-    
-    
-    #results_df = pd.Series()
-    #for col_df in resp["aggregations"]["hour_distrib"]["buckets"]:
-    #    results_df = results_df._append(pd.Series([col_df["doc_count"]], index=[col_df["key"]] ))
-    #results_df = results_df.sort_index()
- 
-    if False:
-        print("------------")
-        print(results_df.index.to_numpy)
-        print("type: ", type(results_df.index.to_numpy))
-        print("------------")
-        print(results_df.to_numpy)
-        print("type: ", type(results_df.to_numpy))
-        print("------------")
-   
+    # Create a seaborn visualization
+    sns.set()
+    sns.set_theme()
+    g = sns.relplot(
+        data=results_df,
+        kind="line",
+        x="hour", y="count",
+        #hue="event", style="event",
+    )
+    g.set(xlabel='Hour of the day', ylabel='Number of packets per hour')
+    g.set(ylim=(0, None))
+    fig = g.figure.savefig("figures/traffic_per_hour.pdf")
 
-    #plot
-    fig, ax = plt.subplots()
-    ax.plot(results_df.index, results_df.values)
-    ax.set(xlabel='Hour', ylabel='Number of packets')
-    ax.set_ylim(bottom=0)
-    ax.grid()
-    fig.savefig("figures/traffic_per_hour.pdf")
  
-
 
 
 
