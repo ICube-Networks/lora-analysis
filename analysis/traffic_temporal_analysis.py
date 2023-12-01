@@ -64,22 +64,22 @@ def plot_traffic_per_dayofweek(clientES):
                 "source":"emit(doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString());" }
             }
     },
-        aggs={
-                "day_of_week": {
-      "terms": {
-        "field": "day_of_week",
-        "size": 7
-      },
-      "aggs":{
-        "date-day": {
-          "terms": {
-            "field": "date-day",
-            "size": 1000000
-          }
+    aggs={
+        "day_of_week": {
+            "terms": {
+                "field": "day_of_week",
+                "size": 7
+            },
+            "aggs":{
+                "date-day": {
+                    "terms": {
+                        "field": "date-day",
+                        "size": 1000000
+                    }
+                }
+            }
         }
-      }
-    }
-        },
+    },
     )
     #print(resp)
     
@@ -100,6 +100,7 @@ def plot_traffic_per_dayofweek(clientES):
         data=results_df,
         kind="line",
         x="day_of_week", y="count",
+        palette="tab10",
     )
     g.set(xlabel='Day of the week', ylabel='Number of packets per day')
     g.set(ylim=(0, None))
@@ -175,6 +176,7 @@ def plot_traffic_per_hour(clientES):
         data=results_df,
         kind="line",
         x="hour", y="count",
+        palette="tab10",
         #hue="event", style="event",
     )
     g.set(xlabel='Hour of the day', ylabel='Number of packets per hour')

@@ -9,56 +9,6 @@ from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
 #           ES -> dataframe   (two dimensions array)
 ############################################################
 
-# transform an elastic search reply to an agg query into a pandas dataframe
-def elasticsearch_reply_into_dataframe(es_reply, row_name, col_name, key_as_string=True, debug=False):
-    #dates use the key_as_string field to manipulate strings directly. Else, the field key can be used
-    if key_as_string:
-        key = "key_as_string"
-    else:
-        key = "key"
-    
-    if debug:
-        print("------ DEBUG for elasticsearch_reply_into_dataframe() --------")
-    
-    results_df = pd.DataFrame()
-    for row_df in es_reply["aggregations"][row_name]["buckets"]:
-        nb_total = row_df["doc_count"]
-        nb_total_bis = 0
-        
-        if debug:
-            print("row: ", row_df)
-        
-        #the row does not exist -> add an empty column
-        if row_df["key"] not in results_df.index :
-            if debug :
-                print("the row ", row_df["key"], " does not exist")
-            results_df.loc[row_df["key"], :] = [0] * len(results_df.columns)
-        
-        for col_df in row_df[col_name]["buckets"]:
-            if col_df["doc_count"] > 0 :
-                
-                #create the column if it doesn't exit --> no need to create the corresponding column. Automatically added to the row if it doesn't exist
-                #if col_df[key] not in results_df.columns :
-                #    if debug :
-                #        print("the col ", col_df[key] , " does not exist")
-                #    pd.concat(axis=1, [results_df, ])
-                #    results_df.insert(0, col_df[key] ,  [0] * len(results_df) , True)
-
-                #store the current value in the corresponding cell of the dataframe
-                if debug :
-                    print("   >", col_df[key], "=", col_df["doc_count"])
-                nb_total_bis += col_df["doc_count"]
-                results_df.loc[[row_df["key"]],[col_df[key]]] = col_df["doc_count"]
-          
-    
-        if debug :
-            print("       ", nb_total, " =?= ", nb_total_bis)
-
-    if debug:
-        print("------------")
-
-    return(results_df)
-
 
 # walk recursively in an aggregated reply
 def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, key_as_string, debug=False):

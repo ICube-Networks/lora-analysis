@@ -21,6 +21,9 @@ import requests, json, os, tarfile, pathlib
 from datetime import datetime
 import matplotlib.dates as mdates
 
+# Import seaborn
+import seaborn as sns
+
 ############################################################
 #           CONNECTION TO ES SERVER
 ############################################################
@@ -85,37 +88,54 @@ resp = clientES.options(
 
         
 # print
-if DEBUG_ES:
-    print(resp["aggregations"]["SF"])
+if True:
+    #print(resp)
     print("------------")
 
 
-# transform the aggregation results into a pandas' dataframe
-results_df = tools.elasticsearch_reply_into_dataframe(es_reply= resp, row_name="SF", col_name="date", debug=False, )
+results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("SF", "date"), key_as_string=True, debug=False, )
+dtime = datetime(2020, 9, 1, 20)
+results_df = results_df[results_df['date'] > dtime.timestamp()]
+results_df = results_df[results_df['count'] > 0]
+results_df['date'] = pd.to_datetime(results_df['date'], unit='ms')
+
 print(results_df)
 
 
-#plot
-fig, ax = plt.subplots()
-for SF in results_df.index:
-    x = results_df.columns
-    y = results_df.loc[SF]
-    ax.plot(mdates.date2num(x), y, label=SF)    # transform the date in seconds into a "real" date
 
-#labels
-ax.set(xlabel='Date', ylabel='Number of packets')
-ax.legend()
 
-#xtics = a date
+# transform the aggregation results into a pandas' dataframe
+#results_df = tools.elasticsearch_reply_into_dataframe(es_reply= resp, row_name="SF", col_name="date", debug=False, )
+
+
+
+
+
+# Create a seaborn visualization
+sns.set()
+sns.set_theme()
+g = sns.relplot(
+    data=results_df,
+    kind="line",
+    x="date", y="count",
+    hue="SF", style="SF",
+    palette="tab10",
+)
+
+# common
+axes = g.axes.flat[0]
+g.set(xlabel='Date', ylabel='Number of packets per day')
+g.set(ylim=(0, None))
+
+# formating dates
 locator = mdates.AutoDateLocator()
 formatter = mdates.ConciseDateFormatter(locator)
-ax.xaxis.set_major_locator(locator)
-ax.xaxis.set_major_formatter(formatter)
-ax.set_xlim(np.datetime64('2020-09-01'), np.datetime64('2022-02-01'))
+axes.xaxis.set_major_locator(locator)
+axes.xaxis.set_major_formatter(formatter)
+#axes.tick_params(axis='x', rotation=90)
+axes.margins(x=0)
 
+# save the figure
+fig = g.figure.savefig("figures/SF_distribution_week.pdf")
 
-#final result stored in a file
-fig.savefig("figures/SF_distribution_week.pdf")
-
-
-
+ 
