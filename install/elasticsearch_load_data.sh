@@ -19,9 +19,9 @@ if [ -z "${DIR_DUMPS}" ]; then
 fi
 
 #extract the parameters from the python file
-INDEX_NAME=`cat ../scripts/myconfig.py | grep "index_name" | cut -d '"' -f 2`
-USER=`cat ../scriptsmyconfig.py | grep "user" | cut -d '"' -f 2`
-PASSWORD=`cat ../scriptsmyconfig.py | grep "password" | cut -d '"' -f 2`
+INDEX_NAME=`cat ../config/myconfig.py | grep "index_name" | cut -d '"' -f 2`
+USER=`cat ../config/myconfig.py | grep "user" | cut -d '"' -f 2`
+PASSWORD=`cat ../config/myconfig.py | grep "password" | cut -d '"' -f 2`
 
 #npm verification
 if ! npm -v &> /dev/null
@@ -31,7 +31,7 @@ then
 fi
 
 #install npm elastic dump if required
-ELASTICDUMP_BIN="node_modules/elasticdump/bin/elasticdump"
+ELASTICDUMP_BIN="../node_modules/elasticdump/bin/elasticdump"
 if [[ ! -x $ELASTICDUMP_BIN ]]
 then
     npm install elasticdump
@@ -68,7 +68,8 @@ do
 --input=${filename_json} \
 --type=data --limit=10000
        "
-    #exit 2
+
+
     NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
             --output=https://${USER}:${PASSWORD}@${IP_ADDR}:9200/$INDEX_NAME \
             --input=${filename_json} \
@@ -79,14 +80,4 @@ do
     rm $filename_json
 
 done
-
-
-if False
-then
-    docker run --name elasticdump --mount type=bind,source=${DIR_RESULT},target=/data --rm -ti elasticdump/elasticsearch-dump \
-            --input=http://lora-es.icube.unistra.fr:9200/lora_gateway_rx_v3 \
-            --output=/data/lora_gateway_rx_v3_data_`echo $date`.json \
-            --type=data --limit=10000 --debug=yes \
-            --searchBody="{\"query\":{  \"range\": {\"mqtt_time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
-fi
 
