@@ -173,4 +173,6 @@ package.json
 #figures
 analysis/figures/*
 
+# other repo
 lora-tools/
+tools/lora-guillaume/
