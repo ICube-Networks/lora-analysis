@@ -2,8 +2,8 @@
 CONTAINER_ES_NAME="elastic-server"
 CONTAINER_KIB_NAME="kibana-server"
 
-ES_VERSION="8.10.2"
-KIB_VERSION="8.10.2"
+ES_VERSION="8.11.1"
+KIB_VERSION="8.11.1"
 
 CONFIG_FILE="../config/myconfig.py"
 
