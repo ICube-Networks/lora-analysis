@@ -52,6 +52,9 @@ We provide the following scripts to dump/load data in elastic search servers:
 * `elasticsearch_load_data.sh` is a bash script to connect to the local installation and that injects the dump in the local elastic search instance
 
 
+You can explore the dataset in Kibana (cf. install section), by default: [http://localhost:5601/app/enterprise_search/content/search_indices/lora-index](http://localhost:5601/app/enterprise_search/content/search_indices/lora-index)
+
+
 
 # Data analysis
 
