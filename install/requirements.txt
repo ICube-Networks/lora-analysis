@@ -1,0 +1,7 @@
+elasticsearch
+matplotlib
+numpy
+pandas
+requests
+seaborn
+

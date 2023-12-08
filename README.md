@@ -9,6 +9,7 @@ The repository is structured as follows:
 
 # Installation
 
+## Docker
 We provide the scripts for a docker installation of Kibana and elastic search. 
 Please run: `docker_create_elastic_servers`
 
@@ -18,8 +19,31 @@ Please run: `docker_create_elastic_servers`
 
 * You can use the Kibana interface to dig into the elastic search index ``http://localhost:5601``
 
+## Python packages
 
-# Dataset 
+We rely on the following Python packages:
+* pandas
+* requests
+* elasticsearch
+* seaborn
+* matplotlib
+
+You can install them with:
+
+* `python3 -m venv .venv`
+* `source .venv/bin/activate`
+* `pip install -r install/requirements.txt`
+
+## Elasticdump
+
+We rely on elasticdump () to backup and restore the dataset:
+
+* `npm install elasticdump@6.104.0`
+
+**Caution**: more recent versions of elasticdump seem **not working** (for an unknown reason, no error message)
+
+
+## Dataset 
 
 We provide the following scripts to dump/load data in elastic search servers:
 
@@ -29,7 +53,17 @@ We provide the following scripts to dump/load data in elastic search servers:
 
 
 
-# Analysis
+# Data analysis
+
+## Structuration
+
+* All scripts use `myconfig.py` to store the credentials for elastic search.
+* All plots are saved in pdf format in the `analysis/figures` directory. 
+
+
+## Scripts
+
+You should use a local venv for your Python packages, and activate it (`source .venv/bin/activate`). Please see the install section.
 
 We implemented the following analysis:
 
@@ -37,5 +71,6 @@ We implemented the following analysis:
 
 * `traffic_temporal_analysis.py`: temporal analysis of the traffic (per day of week, per hour)
 
+* `flow-distribution.py`: CDF of the traffic per gateway and device
 
-NB: all the scripts use `myconfig.py` to store the credentials for elastic search.
+
