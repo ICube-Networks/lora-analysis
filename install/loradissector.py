@@ -73,11 +73,17 @@ def process_phypayload(phypayload):
     elif mtype == MTYPE_CONFIRMED_DATA_UP:
         extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
     elif mtype == MTYPE_CONFIRMED_DATA_DOWN:
-        LOGGER.info("downlink phypayload: %s", binascii.hexlify(bin_data['phypayload']))
-        extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))      #reactivated
+        #LOGGER.info("** Downlink phypayload: %s", binascii.hexlify(bin_data['phypayload']))
+        extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
+    elif mtype == MTYPE_RFU:
+        #decode_data_genericLOGGER.info("** RFU phypayload: %s", binascii.hexlify(bin_data['phypayload']))
+        extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
+    elif mtype == MTYPE_PROPRIETARY:
+        #LOGGER.info("** Proprietary phypayload: %s", binascii.hexlify(bin_data['phypayload']))
+        extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
     else:
-        LOGGER.info(" *** Unsupported type")
-    
+         LOGGER.info("*** Unsupported type: %d  (payload = %s)", mtype, binascii.hexlify(bin_data['phypayload']))
+
     #display_extra_infos(bin_data, extra_infos)
     return extra_infos
 
@@ -161,7 +167,7 @@ def decode_data_generic(bin_data, mtype):
     try:
         devaddr, bin_fctrl, fcnt = struct.unpack("=IBH", macpayload[0:7])
     except struct.error as err:
-        LOGGER.info("decode_data_generic: Error decoding macPayload")
+        LOGGER.info("decode_data_generic: Error decoding macPayload: %s", base64.b64encode(bin_data['phypayload']))
         return output
     output['macPayload']['fhdr']['devAddr'] = "%08x" % devaddr
     output['macPayload']['fhdr']['fCnt'] = fcnt
@@ -270,9 +276,18 @@ def main():
     #process_phypayload("YBKYPgCFJ5cDQAcAAfKHr5E=")
     # confirmed up
     #process_phypayload("gMEP6QYAW7wB2JZAV68cvyB8xNkBo2GskWM=")
-
-
-    process_phypayload('KdkSr46zVX2zimPMpDwT7ZyX2stq')
+    
+    print(process_phypayload('y6PLK1UIAAA='))
 
 if __name__ == "__main__":
     main()
+
+
+#+szGxdprJE/Y1dcMy5EENm5X9b5V
+#INFO:phypayload_dissector:*** Unsupported type: b'ff13b949cbc67fb8a276b579c7662ef5c085ffc1d7'  |    b'\xff\x13\xb9I\xcb\xc6\x7f\xb8\xa2v\xb5y\xc7f.\xf5\xc0\x85\xff\xc1\xd7'
+
+
+#payload= 9bswwWvSYxsRTnhtlc0wpMXCxopB
+#INFO:phypayload_dissector:*** Unsupported type: b'f5bb30c16bd2631b114e786d95cd30a4c5c2c68a41'  |    b'\xf5\xbb0\xc1k\xd2c\x1b\x11Nxm\x95\xcd0\xa4\xc5\xc2\xc6\x8aA'
+
+#INFO:phypayload_dissector:decode_data_generic: Error decoding macPayload: b'4711fe246a2d45a2cf0511'
