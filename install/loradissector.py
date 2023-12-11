@@ -78,7 +78,7 @@ def process_phypayload(phypayload):
     else:
         LOGGER.info(" *** Unsupported type")
     
-    display_extra_infos(bin_data, extra_infos)
+    #display_extra_infos(bin_data, extra_infos)
     return extra_infos
 
 
@@ -117,7 +117,7 @@ def decode_join_accept(bin_data):
     mhdr = phypayload[0]
     macpayload = phypayload[1:-4]
     mic = phypayload[-4:]
-    assert (len(mhdr) + len(macpayload) + len(mic)) == len(phypayload)
+    assert (1 + len(macpayload) + len(mic)) == len(phypayload)
 
     # Data encrypted ...
     appnonce = macpayload[0:3]
@@ -263,13 +263,16 @@ mic:"0c045b79"
 def main():
     """ Main"""
     ## JR zigduino-7
-    process_phypayload("AFR2mJB4VjQSBwAAkHhWNBJpSqd98Ag=")
+    #process_phypayload("AFR2mJB4VjQSBwAAkHhWNBJpSqd98Ag=")
     # lopy4-05 unconfirmed uplink
-    process_phypayload("QNFdlwOAtDgB69p4RpQ55y9xNj/4poGNVsImkBhdaQwEW3k=")
+    #process_phypayload("QNFdlwOAtDgB69p4RpQ55y9xNj/4poGNVsImkBhdaQwEW3k=")
     # Downlink bug
-    process_phypayload("YBKYPgCFJ5cDQAcAAfKHr5E=")
+    #process_phypayload("YBKYPgCFJ5cDQAcAAfKHr5E=")
     # confirmed up
-    process_phypayload("gMEP6QYAW7wB2JZAV68cvyB8xNkBo2GskWM=")
+    #process_phypayload("gMEP6QYAW7wB2JZAV68cvyB8xNkBo2GskWM=")
+
+
+    process_phypayload('KdkSr46zVX2zimPMpDwT7ZyX2stq')
 
 if __name__ == "__main__":
     main()
