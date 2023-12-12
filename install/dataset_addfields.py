@@ -5,6 +5,7 @@ sys.path.insert(1, '../analysis')
 
 # elastic search for the queries
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import streaming_bulk
 
 # configuration parameters
 import myconfig
@@ -45,6 +46,7 @@ clientES = Elasticsearch(
     "https://localhost:9200",
     verify_certs=False,
     ssl_show_warn=False,
+    http_auth=(myconfig.user, myconfig.password)
 )
 print(clientES)
 
@@ -88,31 +90,49 @@ while True:
                 0
         ],
     )
-    #print("Got %d Hits:" % response['hits']['total']['value'])
+    
+    
+    # reinit the next bulk update query
+    bulk_update = []
 
     # one update per doc
     for num, doc in enumerate(response['hits']['hits']):
-          
-        #print("---********--")
+                
+        # has this record already extra info with the right info?
+        try:
+            assert(doc['_source']['extra_infos']['version'] == loradissector.VERSION)
+            
+        except (KeyError, AssertionError) as e:
+            
+            #construct the nex update for this id (decoding the LoRa frame)
+            req_update = {}
+            req_update['_index']    = myconfig.index_name
+            req_update['_id']       = doc['_id']
+            req_update['doc'] = {}          # all the info has to be put in the 'doc' key
+            req_update['doc']['extra_infos'] = loradissector.process_phypayload(doc['_source']['phyPayload'])
+            #print(json.dumps(req_update['doc']['extra_infos'], sort_keys=True, indent=4))
+            
+                    
+            #update_response = clientES.options(
+            #    basic_auth=(myconfig.user, myconfig.password),
+            #).update(
+            #    index=myconfig.index_name,
+            #    id=doc['_id'],
+            #    body=extra_infos
+            #)
+           
+           
+            # insert this update to the current sequence
+            bulk_update.append(req_update)
+            #print(bulk_update)
+            
+    for okay, result in streaming_bulk(client=clientES, actions=bulk_update):
+        action, result = result.popitem()
+    
+        if not okay:
+            print("Update failed: ", result["_id"])
 
-        #decode the LoRaWAN frame
-        #print("payload=", doc['_source']['phyPayload'])
-        extra_infos = loradissector.process_phypayload(doc['_source']['phyPayload'])
-        rich_info= {}
-        rich_info['version'] = 0.6
-        rich_info['extra'] = extra_infos
-        print(json.dumps(rich_info, sort_keys=True, indent=4))
-
-
-
-        #response = elastic_client.update(
-        #    index=myconfig.index_name,
-        #    doc_type=""_doc"",
-        #    id=doc_id['_id'],
-        #    body=source_to_update
-        #)
-
-
+   
     #stops if we have less than QUERY_SIZE elements, it was the last response
     length= len(response['hits']['hits'])
     #extracts the mqtt-time of the last element to then scroll later
