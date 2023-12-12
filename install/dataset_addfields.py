@@ -29,8 +29,16 @@ import matplotlib.dates as mdates
 # Import seaborn
 import seaborn as sns
 
+#logs
+import logging
+LOGGER = logging.getLogger('dataset_decodeFrames')
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+
 
 QUERY_NB_RESULT = 10000
+
+
 
 
 
@@ -46,11 +54,17 @@ clientES = Elasticsearch(
     "https://localhost:9200",
     verify_certs=False,
     ssl_show_warn=False,
-    http_auth=(myconfig.user, myconfig.password)
+#    http_auth=(myconfig.user, myconfig.password)
 )
 print(clientES)
 
-
+clientES_bulk = Elasticsearch(
+    "https://localhost:9200",
+    verify_certs=False,
+    ssl_show_warn=False,
+    http_auth=(myconfig.user, myconfig.password)
+)
+print(clientES_bulk)
 
 
 ############################################################
@@ -65,6 +79,7 @@ result = clientES.options(
         )
 pit_id = result['id']
 print("PID id: ", pit_id)
+
 
 
 
@@ -90,8 +105,7 @@ while True:
                 0
         ],
     )
-    
-    
+
     # reinit the next bulk update query
     bulk_update = []
 
@@ -103,38 +117,36 @@ while True:
             assert(doc['_source']['extra_infos']['version'] == loradissector.VERSION)
             
         except (KeyError, AssertionError) as e:
-            
+        
+            #we MUST have phyPayload
+            if not doc.__contains__('_source') or not doc['_source'].__contains__('phyPayload'):
+                LOGGER.error("** Decoding the Loraframe: The doc has no phyPayload")
+                LOGGER.error(json.dumps(doc, sort_keys=True, indent=4))
+                print(doc.__contains__('_source'))
+                print(doc['_source'].__contains__('phyPayload'))
+                exit(2)
+                            
             #construct the nex update for this id (decoding the LoRa frame)
             req_update = {}
             req_update['_index']    = myconfig.index_name
             req_update['_id']       = doc['_id']
             req_update['doc'] = {}          # all the info has to be put in the 'doc' key
             req_update['doc']['extra_infos'] = loradissector.process_phypayload(doc['_source']['phyPayload'])
-            #print(json.dumps(req_update['doc']['extra_infos'], sort_keys=True, indent=4))
+            LOGGER.debug(json.dumps(req_update['doc']['extra_infos'], sort_keys=True, indent=4))
             
-                    
-            #update_response = clientES.options(
-            #    basic_auth=(myconfig.user, myconfig.password),
-            #).update(
-            #    index=myconfig.index_name,
-            #    id=doc['_id'],
-            #    body=extra_infos
-            #)
-           
-           
             # insert this update to the current sequence
             bulk_update.append(req_update)
-            #print(bulk_update)
+            LOGGER.debug(bulk_update)
             
-    for okay, result in streaming_bulk(client=clientES, actions=bulk_update):
+    for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
         action, result = result.popitem()
     
         if not okay:
-            print("Update failed: ", result["_id"])
+            LOGGER.error("Update failed: ", result["_id"])
 
    
     #stops if we have less than QUERY_SIZE elements, it was the last response
-    length= len(response['hits']['hits'])
+    length = len(response['hits']['hits'])
     #extracts the mqtt-time of the last element to then scroll later
     datemin = response['hits']['hits'][length-1]['_source']['mqtt_time']
     if (length < QUERY_NB_RESULT):
@@ -143,21 +155,5 @@ while True:
 #delete the PIT
 clientES.close_point_in_time(id=pit_id)
 
-#no error
-exit(0)
-
-
-
-
-print("------------")
-
-
-
-for i in range(4):
-    print("------------")
-    print(docs[i])
-    print("****")
-    loradissector.process_phypayload(docs[i]['_source']['phyPayload'])
-print("------------")
 
 
