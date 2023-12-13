@@ -34,10 +34,11 @@ import logging
 LOGGER = logging.getLogger('dataset_decodeFrames')
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
+logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
 QUERY_NB_RESULT = 1000
-
+EXTRA_INFO_VERSION = "1.0"
 
 
 
@@ -54,24 +55,16 @@ clientES = Elasticsearch(
     "https://localhost:9200",
     verify_certs=False,
     ssl_show_warn=False,
+    basic_auth=(myconfig.user, myconfig.password)
 )
 print(clientES)
 
 
 
-#for the bulk update specifically
-clientES_bulk = Elasticsearch(
-    "https://localhost:9200",
-    verify_certs=False,
-    ssl_show_warn=False,
-    basic_auth=(myconfig.user, myconfig.password)
-)
-print(clientES_bulk)
-
 
 
 ############################################################
-#          PIT CONNECTION
+#   SEARCH for records without extra_infos to update them
 ############################################################
 
 
@@ -81,6 +74,7 @@ print(clientES_bulk)
 # Scroll all the documents of the elastic search index, using the PIT to scroll until the end
 datemin="0"
 while True:
+    #search records without the right extra info version
     response = clientES.options(
         basic_auth=(myconfig.user, myconfig.password),
     ).search(
@@ -90,12 +84,12 @@ while True:
             "bool": {
                 "must_not": {
                     "term" :{
-                        "extra_infos.version": "1.0"
+                        "extra_infos.version": EXTRA_INFO_VERSION
                     }
                 }
             }
         },
-        #request_timeout=300,
+        #sort them chronologically (just because it's convenient for debuging)
         sort=[
                 {"mqtt_time": {"order": "asc"}},
                 {"_score": {"order": "desc"}},
@@ -143,7 +137,7 @@ while True:
             
     #push the update
     #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-    for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update, chunk_size=1000):
+    for okay, result in streaming_bulk(client=clientES, actions=bulk_update, chunk_size=1000):
         action, result = result.popitem()
         
         #print("action: ", action)
