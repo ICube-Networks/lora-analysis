@@ -36,14 +36,14 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 
-QUERY_NB_RESULT = 10000
+QUERY_NB_RESULT = 1000
 
 
 
 
 
 ############################################################
-#           CONNECTION TO ES SERVER
+#           CONNECTION TO ES SERVER with PIT
 ############################################################
 
 
@@ -54,31 +54,26 @@ clientES = Elasticsearch(
     "https://localhost:9200",
     verify_certs=False,
     ssl_show_warn=False,
-#    http_auth=(myconfig.user, myconfig.password)
 )
 print(clientES)
 
+
+
+#for the bulk update specifically
 clientES_bulk = Elasticsearch(
     "https://localhost:9200",
     verify_certs=False,
     ssl_show_warn=False,
-    http_auth=(myconfig.user, myconfig.password)
+    basic_auth=(myconfig.user, myconfig.password)
 )
 print(clientES_bulk)
+
 
 
 ############################################################
 #          PIT CONNECTION
 ############################################################
 
-result = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password)
-        ).open_point_in_time(
-            index=myconfig.index_name,
-            keep_alive="1m"
-        )
-pit_id = result['id']
-print("PID id: ", pit_id)
 
 
 
@@ -89,23 +84,30 @@ while True:
     response = clientES.options(
         basic_auth=(myconfig.user, myconfig.password),
     ).search(
-        #index=myconfig.index_name,
+        index=myconfig.index_name, #no index for PIT connections
         size=QUERY_NB_RESULT,
+        query={
+            "bool": {
+                "must_not": {
+                    "term" :{
+                        "extra_infos.version": "1.0"
+                    }
+                }
+            }
+        },
         #request_timeout=300,
         sort=[
                 {"mqtt_time": {"order": "asc"}},
                 {"_score": {"order": "desc"}},
-        ],
-        pit={
-            "id": pit_id,
-            "keep_alive": "1m",
-        },
-        search_after=[
-                datemin,
-                0
-        ],
+        ]
     )
-
+    #extracts the mqtt-time of the last element to then scroll later
+    length = len(response['hits']['hits'])
+    #print("length:", length)
+    if (length == 0):
+        break
+    
+    
     # reinit the next bulk update query
     bulk_update = []
 
@@ -117,7 +119,9 @@ while True:
             assert(doc['_source']['extra_infos']['version'] == loradissector.VERSION)
             
         except (KeyError, AssertionError) as e:
-        
+            #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
+            #LOGGER.info(json.dumps(doc, sort_keys=True, indent=4))
+
             #we MUST have phyPayload
             if not doc.__contains__('_source') or not doc['_source'].__contains__('phyPayload'):
                 LOGGER.error("** Decoding the Loraframe: The doc has no phyPayload")
@@ -125,35 +129,34 @@ while True:
                 print(doc.__contains__('_source'))
                 print(doc['_source'].__contains__('phyPayload'))
                 exit(2)
-                            
+              
             #construct the nex update for this id (decoding the LoRa frame)
-            req_update = {}
-            req_update['_index']    = myconfig.index_name
-            req_update['_id']       = doc['_id']
-            req_update['doc'] = {}          # all the info has to be put in the 'doc' key
-            req_update['doc']['extra_infos'] = loradissector.process_phypayload(doc['_source']['phyPayload'])
-            LOGGER.debug(json.dumps(req_update['doc']['extra_infos'], sort_keys=True, indent=4))
-            
+            req_update = doc['_source']
+            req_update['_index']         = myconfig.index_name
+            req_update['_id']            = doc['_id']
+            req_update['extra_infos']   = loradissector.process_phypayload(doc['_source']['phyPayload'])         # use the previous doc
+            #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+              
             # insert this update to the current sequence
             bulk_update.append(req_update)
             LOGGER.debug(bulk_update)
             
-    for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
+    #push the update
+    #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
+    for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update, chunk_size=1000):
         action, result = result.popitem()
-    
+        
+        #print("action: ", action)
+        #print("result: ", result)
+
         if not okay:
             LOGGER.error("Update failed: ", result["_id"])
-
-   
+            
+        
     #stops if we have less than QUERY_SIZE elements, it was the last response
-    length = len(response['hits']['hits'])
-    #extracts the mqtt-time of the last element to then scroll later
-    datemin = response['hits']['hits'][length-1]['_source']['mqtt_time']
     if (length < QUERY_NB_RESULT):
         break
 
-#delete the PIT
-clientES.close_point_in_time(id=pit_id)
 
 
 
