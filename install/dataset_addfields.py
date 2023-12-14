@@ -6,7 +6,7 @@ sys.path.insert(1, '../analysis')
 # elastic search for the queries
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import streaming_bulk
-
+from elasticsearch.helpers import parallel_bulk
 # configuration parameters
 import myconfig
 
@@ -137,7 +137,7 @@ while True:
             
     #push the update
     #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-    for okay, result in streaming_bulk(client=clientES, actions=bulk_update, chunk_size=1000):
+    for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4):
         action, result = result.popitem()
         
         #print("action: ", action)

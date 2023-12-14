@@ -183,3 +183,30 @@ The day is the period comprised between 7am and 7pm
 	    }
 	  }
 	}
+
+
+# number of mtypes per devADDR
+
+	GET /lora-index/_search?pretty=true
+	{
+	"size":0,
+	"query": {
+	    "bool": {
+	      "must_": [
+	            {
+	              "exists": {
+	              "field": "extra_infos.phyPayload.macPayload.fhdr.devAddr"
+	             }
+	          }
+	        ]
+	    }
+	  },
+	  "aggs":{
+	    "mtype":{
+	      "terms":{
+	        "field":"extra_infos.phyPayload.mhdr.mType",
+	        "size":1000000
+	      }
+	    }
+	  }
+	}

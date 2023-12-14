@@ -23,11 +23,15 @@ import matplotlib.dates as mdates
 
 # Import seaborn
 import seaborn as sns
-    
-    
-# trafic per day of week
-def plot_pkt_per_flow(clientES):
+   
+#logs
+import logging
+LOGGER = logging.getLogger('dataset_decodeFrames')
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
+
+
+def es_query_count_for_field(clientES, fieldname):
     #get the number of valid records per day of the week
     resp = clientES.options(
         basic_auth=(myconfig.user, myconfig.password)
@@ -38,37 +42,64 @@ def plot_pkt_per_flow(clientES):
         pretty=True,
         human=True,
         aggs={
-            "pkts_per_MAC": {
+            fieldname: {
                 "terms": {
-                    "field": "rxInfo.gatewayID.keyword",
-                    "size": 1000000,
+                    "field": fieldname,
+                    "size": 10000000,
                 }
             }
-            }
+        }
     )
-    print(resp)
+    #print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("pkts_per_MAC",), key_as_string=False, debug=False)
-
-    #result
-    print(results_df)
-
-    # Create a seaborn visualization
-    sns.set()
-    sns.set_theme()
-    g = sns.ecdfplot(
-    #g = sns.displot(
-        data=results_df,
-    #    kind="kde",
-        x="count",
-    #    palette="tab10",   #only if hue specified
-    )
-    g.set(xlabel='Number of packets per MAC address',)
-   # g.set(ylim=(0, None))
-   # g.set_xticklabels(tools.dayofweek.short[:len(tools.dayofweek.short)])
-    fig = g.figure.savefig("figures/traffic_distribution_per_device.pdf")
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(fieldname,), key_as_string=False, debug=False)
     
+    
+    if results_df.empty:
+        LOGGER.critical("Empty pandaframe")
+        exit(2)
+    
+    #result
+    return(results_df)
+ 
+    
+# trafic per day of week
+def plot_pkt_per_flow(clientES):
+
+    params = []
+    
+    #devAddr
+    params.append({
+        'fieldname' : 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
+        'xlabel' : 'Number of packets per devAddr',
+        'figname' : 'figures/traffic_distribution_per_devAddr.pdf'
+        })
+    #devEUI
+    params.append({
+        'fieldname' : 'extra_infos.phyPayload.macPayload.devEUI.keyword',
+        'xlabel' : 'Number of packets per devEUI',
+        'figname' : 'figures/traffic_distribution_per_devEUI.pdf'
+        })
+
+
+    for param in params:
+        #es query
+        results_df = es_query_count_for_field(clientES=clientES, fieldname=param['fieldname'])
+        print(results_df)
+        
+        # Create a seaborn visualization
+        sns.set()
+        sns.set_theme()
+        g = sns.ecdfplot(
+            data=results_df,
+            x="count",
+        #    palette="tab10",   #only if hue specified
+        )
+        g.set(xlabel=param['xlabel'],)
+        fig = g.figure.savefig(param['figname'])
+        #flush for the next one
+        g.figure.clf()
 
 
 
