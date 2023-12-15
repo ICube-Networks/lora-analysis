@@ -26,26 +26,46 @@ import seaborn as sns
    
 #logs
 import logging
-LOGGER = logging.getLogger('dataset_decodeFrames')
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logger_flow = logging.getLogger('flow_distribution')
+logger_flow.setLevel(logging.INFO)
+logging.basicConfig(stream=sys.stdout)
 
 
 
-def es_query_count_for_field(clientES, fieldname):
+def es_query_count_for_field(clientES, params):
     #get the number of valid records per day of the week
     resp = clientES.options(
         basic_auth=(myconfig.user, myconfig.password)
     ).search(
         index=myconfig.index_name,
         size=0,
-        request_timeout=300,
+        request_timeout=3000,
         pretty=True,
         human=True,
+        query={
+            "bool": {
+              "must": [
+                    {
+                      "exists": {
+                      "field": "extra_infos"
+                     }
+                  }
+                ]
+            }
+        },
         aggs={
-            fieldname: {
+            params['fieldname1']: {
                 "terms": {
-                    "field": fieldname,
-                    "size": 10000000,
+                    "field": params['fieldname1'],
+                    "size": 1000,
+                },
+                "aggs": {
+                    params['fieldname2']: {
+                        "terms": {
+                            "field": params['fieldname2'],
+                            "size": 1000,
+                        }
+                    }
                 }
             }
         }
@@ -53,11 +73,11 @@ def es_query_count_for_field(clientES, fieldname):
     #print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(fieldname,), key_as_string=False, debug=False)
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(params['fieldname1'],params['fieldname2']), key_as_string=False)
     
     
     if results_df.empty:
-        LOGGER.critical("Empty pandaframe")
+        logger_flow.critical("Empty pandaframe")
         exit(2)
     
     #result
@@ -67,26 +87,32 @@ def es_query_count_for_field(clientES, fieldname):
 # trafic per day of week
 def plot_pkt_per_flow(clientES):
 
-    params = []
+    params_list = []
     
     #devAddr
-    params.append({
-        'fieldname' : 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
+    params_list.append({
+        'fieldname1' : 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
+        'fieldname2' : 'rxInfo.gatewayID.keyword',
         'xlabel' : 'Number of packets per devAddr',
         'figname' : 'figures/traffic_distribution_per_devAddr.pdf'
         })
     #devEUI
-    params.append({
-        'fieldname' : 'extra_infos.phyPayload.macPayload.devEUI.keyword',
+    params_list.append({
+        'fieldname1' : 'extra_infos.phyPayload.macPayload.devEUI.keyword',
+        'fieldname2' : 'rxInfo.gatewayID.keyword',
         'xlabel' : 'Number of packets per devEUI',
         'figname' : 'figures/traffic_distribution_per_devEUI.pdf'
         })
 
 
-    for param in params:
+    for params in params_list:
         #es query
-        results_df = es_query_count_for_field(clientES=clientES, fieldname=param['fieldname'])
+        results_df = es_query_count_for_field(clientES=clientES, params=params)
         print(results_df)
+        
+        
+        str = params['fieldname2']
+        print(str)
         
         # Create a seaborn visualization
         sns.set()
@@ -94,10 +120,14 @@ def plot_pkt_per_flow(clientES):
         g = sns.ecdfplot(
             data=results_df,
             x="count",
+            hue=str,
         #    palette="tab10",   #only if hue specified
         )
-        g.set(xlabel=param['xlabel'],)
-        fig = g.figure.savefig(param['figname'])
+        #g.set_xlim(0, 1000)
+        g.set(xlabel=params['xlabel'],)
+        fig = g.figure.savefig(params['figname'])
+        plt.legend(bbox_to_anchor=(1, 1), loc=2)
+        #g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         #flush for the next one
         g.figure.clf()
 
