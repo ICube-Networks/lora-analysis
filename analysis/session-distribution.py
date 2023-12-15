@@ -84,12 +84,12 @@ def plot_sessions(clientES):
     sns.set_theme()
     g = sns.ecdfplot(
         data=results_df,
-        x="session_duration (in days)",
+        x="session_duration",
     #    hue=str,
     #    palette="tab10",   #only if hue specified
     )
     axes = g.axes
-    g.set(xlabel='Duration of the session',)
+    g.set(xlabel='Duration of the session (in days)',)
     
     # formating dates -> not required since this is not a date but a difference (=duration)
     #locator = mdates.AutoDateLocator()
