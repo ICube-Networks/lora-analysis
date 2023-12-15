@@ -17,7 +17,7 @@ logger_tool.setLevel(logging.WARN)
 
 
 # walk recursively in an aggregated reply
-def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, field_value, key_as_string):
+def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, field_values, key_as_string):
     if key_as_string:
         key = "key_as_string"
     else:
@@ -30,13 +30,16 @@ def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, fie
         tuple['count'] = [es_reply['doc_count']]
         
         # the parameter is not an empty string: store as well the corresponding value
-        if field_value:
+        for field_value in field_values:
+            
+            logger_tool.debug("Field: ", field_value)
+
+        
             tuple[field_value] = [es_reply[field_value]['value']]
             if 'value_as_string' in es_reply[field_value]:
                 tuple[field_value+'as_string'] = [es_reply[field_value]['value_as_string']]
-        else:
-            logger_tool.debug("No field value to store: " + field_value)
-
+        
+        
         
         results_df = pd.concat([results_df, pd.DataFrame.from_dict(tuple)], ignore_index=True)
         return(results_df)
@@ -55,14 +58,14 @@ def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, fie
     
         # store the corresponding value for this tuple
         tuple[agg_names[depth]] = [elem['key']]
-        results_df = elasticsearch_walk_aggrep(es_reply=elem, agg_names=agg_names, depth=depth+1, results_df=results_df, tuple=tuple, field_value=field_value, key_as_string=key_as_string)
+        results_df = elasticsearch_walk_aggrep(es_reply=elem, agg_names=agg_names, depth=depth+1, results_df=results_df, tuple=tuple, field_values=field_values, key_as_string=key_as_string)
         
     return(results_df)
    
 
 
 # transform an elastic search reply to an agg query into a pandas dataframe
-def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_value="", key_as_string=True):
+def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_values="", key_as_string=True):
     logger_tool.info("Start analysis")
     
        
@@ -71,7 +74,7 @@ def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_value="", key_as
     tuple = {}
     
     #walk in the response of elastic search with the aggregated fields
-    results_df = elasticsearch_walk_aggrep(es_reply=es_reply["aggregations"], agg_names=agg_names, depth=0, results_df=results_df, tuple=tuple, field_value=field_value, key_as_string=key_as_string)
+    results_df = elasticsearch_walk_aggrep(es_reply=es_reply["aggregations"], agg_names=agg_names, depth=0, results_df=results_df, tuple=tuple, field_values=field_values, key_as_string=key_as_string)
     
     logger_tool.info("Start analysis")
     logger_tool.info(results_df)

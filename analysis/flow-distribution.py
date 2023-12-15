@@ -121,14 +121,15 @@ def plot_pkt_per_flow(clientES):
             data=results_df,
             x="count",
             hue=str,
-        #    palette="tab10",   #only if hue specified
+            palette="tab10",   #only if hue specified
         )
         #g.set_xlim(0, 1000)
-        g.set(xlabel=params['xlabel'],)
-        fig = g.figure.savefig(params['figname'])
-        plt.legend(bbox_to_anchor=(1, 1), loc=2)
         #g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        #flush for the next one
+        g.set(xlabel=params['xlabel'],)
+        #plt.legend(bbox_to_anchor=(1, 1), loc=2)
+        
+        #fsave and flush
+        fig = g.figure.savefig(params['figname'])
         g.figure.clf()
 
 

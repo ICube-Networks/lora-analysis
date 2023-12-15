@@ -51,15 +51,15 @@ def eq_query_session_duration(clientES, operator, field_scope, field_value):
                 "order": {operator+field_value: "desc"}
               },
               "aggs":{
-                operator+field_value: {operator: {"field": field_value}}
+                operator+field_value: {operator: {"field": field_value}},
+                "max"+field_value: {"max": {"field": field_value}}
               }
             }
           }
     )
-    print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(field_scope, ), field_value=operator+field_value, key_as_string=False)
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(field_scope, ), field_values=(operator+field_value, "max"+field_value), key_as_string=False)
     
     
     if results_df.empty:
@@ -75,27 +75,27 @@ def plot_sessions(clientES):
 
     #es query
     results_df = eq_query_session_duration(clientES=clientES, operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
-    results_df["minmqtt_timeas_string"] = mdates.date2num(results_df["minmqtt_timeas_string"])
+    #results_df["minmqtt_timeas_string"] = mdates.date2num(results_df["minmqtt_timeas_string"])
+    results_df["session_duration"] = mdates.date2num(results_df["maxmqtt_timeas_string"]) - mdates.date2num(results_df["minmqtt_timeas_string"])
     logger_session.info(results_df)
-    
+  
     # Create a seaborn visualization
     sns.set()
     sns.set_theme()
     g = sns.ecdfplot(
         data=results_df,
-        x="minmqtt_timeas_string",
+        x="session_duration (in days)",
     #    hue=str,
     #    palette="tab10",   #only if hue specified
     )
     axes = g.axes
-    g.set(xlabel='min mqtt-time',)
-    #plt.legend(bbox_to_anchor=(1, 1), loc=2)
-
-    # formating dates
-    locator = mdates.AutoDateLocator()
-    formatter = mdates.ConciseDateFormatter(locator)
-    axes.xaxis.set_major_locator(locator)
-    axes.xaxis.set_major_formatter(formatter)
+    g.set(xlabel='Duration of the session',)
+    
+    # formating dates -> not required since this is not a date but a difference (=duration)
+    #locator = mdates.AutoDateLocator()
+    #formatter = mdates.ConciseDateFormatter(locator)
+    #axes.xaxis.set_major_locator(locator)
+    #axes.xaxis.set_major_formatter(formatter)
     
     fig = g.figure.savefig('figures/session_distribution.pdf')
     g.figure.clf()
