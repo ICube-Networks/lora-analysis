@@ -104,6 +104,18 @@ class queries:
             }
         }
 
+    # the data frames only
+    QUERY_DATA =  {
+            "bool": {
+              "must": [
+                    {
+                        "term": {
+                            "extra_infos.phyPayload.mhdr.mType": "2"
+                        }
+                     }
+                ]
+            }
+        }
 
 ############################################################
 #           Day of the week (string) -> int

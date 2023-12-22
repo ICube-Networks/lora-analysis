@@ -42,17 +42,7 @@ def es_query_count_for_field(clientES, params):
         request_timeout=3000,
         pretty=True,
         human=True,
-        query={
-            "bool": {
-              "must": [
-                    {
-                      "exists": {
-                      "field": "extra_infos"
-                     }
-                  }
-                ]
-            }
-        },
+        query=tools.queries.QUERY_EXTRAINFO_EXIST,
         aggs={
             params['fieldname1']: {
                 "terms": {
