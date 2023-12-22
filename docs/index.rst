@@ -10,7 +10,9 @@ Welcome to Strasbourg's LoRa dataset Analysis's documentation!
    :maxdepth: 2
    :caption: Contents:
    
+   ./install.rst
    ./analysis.rst
+   ./tools.rst
 
    
 Indices and tables

@@ -1,3 +1,20 @@
+""" Enrich the dataset with extrainfos fields .
+
+This scripts parses the dataset to identify records (aka docs) that do not have extrainfo fields to update them. More precisely, it decodes the LoRaWAN frames to construct the extra_info.
+
+"""
+
+__authors__ = ("Fabrice Theoleyre")
+__contact__ = ("fabrice.theolerye@cnrs.fr")
+__copyright__ = "CNRS"
+__date__ = "2023"
+__version__= "1.0"
+
+
+
+
+
+
 # import the config folder
 import sys
 sys.path.insert(1, '../config')
@@ -43,23 +60,6 @@ EXTRA_INFO_VERSION = "1.0"
 
 
 
-############################################################
-#           CONNECTION TO ES SERVER with PIT
-############################################################
-
-
-
-#elastic connection
-DEBUG_ES = False
-clientES = Elasticsearch(
-    "https://localhost:9200",
-    verify_certs=False,
-    ssl_show_warn=False,
-    basic_auth=(myconfig.user, myconfig.password)
-)
-print(clientES)
-
-
 
 
 
@@ -69,87 +69,110 @@ print(clientES)
 
 
 
+# executable
+if __name__ == "__main__":
+    """Executes the script to plot the histogram of the number of packets per SF
+ 
+    """
+     
+
+    ############################################################
+    #           CONNECTION TO ES SERVER with PIT
+    ############################################################
 
 
-# Scroll all the documents of the elastic search index, using the PIT to scroll until the end
-datemin="0"
-while True:
-    #search records without the right extra info version
-    response = clientES.options(
-        basic_auth=(myconfig.user, myconfig.password),
-    ).search(
-        index=myconfig.index_name, #no index for PIT connections
-        size=QUERY_NB_RESULT,
-        query={
-            "bool": {
-                "must_not": {
-                    "term" :{
-                        "extra_infos.version": EXTRA_INFO_VERSION
+
+    #elastic connection
+    DEBUG_ES = False
+    clientES = Elasticsearch(
+        "https://localhost:9200",
+        verify_certs=False,
+        ssl_show_warn=False,
+        basic_auth=(myconfig.user, myconfig.password)
+    )
+    print(clientES)
+
+
+
+    # Scroll all the documents of the elastic search index, using the PIT to scroll until the end
+    datemin="0"
+    while True:
+        #search records without the right extra info version
+        response = clientES.options(
+            basic_auth=(myconfig.user, myconfig.password),
+        ).search(
+            index=myconfig.index_name, #no index for PIT connections
+            size=QUERY_NB_RESULT,
+            query={
+                "bool": {
+                    "must_not": {
+                        "term" :{
+                            "extra_infos.version": EXTRA_INFO_VERSION
+                        }
                     }
                 }
-            }
-        },
-        #sort them chronologically (just because it's convenient for debuging)
-        sort=[
-                {"mqtt_time": {"order": "asc"}},
-                {"_score": {"order": "desc"}},
-        ]
-    )
-    #extracts the mqtt-time of the last element to then scroll later
-    length = len(response['hits']['hits'])
-    #print("length:", length)
-    if (length == 0):
-        break
-    
-    
-    # reinit the next bulk update query
-    bulk_update = []
+            },
+            #sort them chronologically (just because it's convenient for debuging)
+            sort=[
+                    {"mqtt_time": {"order": "asc"}},
+                    {"_score": {"order": "desc"}},
+            ]
+        )
+        #extracts the mqtt-time of the last element to then scroll later
+        length = len(response['hits']['hits'])
+        #print("length:", length)
+        if (length == 0):
+            break
+        
+        
+        # reinit the next bulk update query
+        bulk_update = []
 
-    # one update per doc
-    for num, doc in enumerate(response['hits']['hits']):
+        # one update per doc
+        for num, doc in enumerate(response['hits']['hits']):
+                    
+            # has this record already extra info with the right info?
+            try:
+                assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.VERSION)
                 
-        # has this record already extra info with the right info?
-        try:
-            assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.VERSION)
-            
-        except (KeyError, AssertionError) as e:
-            #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
-            #LOGGER.info(json.dumps(doc, sort_keys=True, indent=4))
+            except (KeyError, AssertionError) as e:
+                #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
+                #LOGGER.info(json.dumps(doc, sort_keys=True, indent=4))
 
-            #we MUST have phyPayload
-            if not doc.__contains__('_source') or not doc['_source'].__contains__('phyPayload'):
-                LOGGER.error("** Decoding the Loraframe: The doc has no phyPayload")
-                LOGGER.error(json.dumps(doc, sort_keys=True, indent=4))
-                print(doc.__contains__('_source'))
-                print(doc['_source'].__contains__('phyPayload'))
-                exit(2)
-              
-            #construct the nex update for this id (decoding the LoRa frame)
-            req_update = doc['_source']
-            req_update['_index']         = myconfig.index_name
-            req_update['_id']            = doc['_id']
-            req_update['extra_infos']   = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])         # use the previous doc
-            #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
-              
-            # insert this update to the current sequence
-            bulk_update.append(req_update)
-            LOGGER.debug(bulk_update)
+                #we MUST have phyPayload
+                if not doc.__contains__('_source') or not doc['_source'].__contains__('phyPayload'):
+                    LOGGER.error("** Decoding the Loraframe: The doc has no phyPayload")
+                    LOGGER.error(json.dumps(doc, sort_keys=True, indent=4))
+                    print(doc.__contains__('_source'))
+                    print(doc['_source'].__contains__('phyPayload'))
+                    exit(2)
+                  
+                #construct the nex update for this id (decoding the LoRa frame)
+                req_update = doc['_source']
+                req_update['_index']         = myconfig.index_name
+                req_update['_id']            = doc['_id']
+                req_update['extra_infos']   = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])         # use the previous doc
+                #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+                  
+                # insert this update to the current sequence
+                bulk_update.append(req_update)
+                LOGGER.debug(bulk_update)
+                
+        #push the update
+        #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
+        for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4):
+            action, result = result.popitem()
             
-    #push the update
-    #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-    for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4):
-        action, result = result.popitem()
-        
-        #print("action: ", action)
-        #print("result: ", result)
+            #print("action: ", action)
+            #print("result: ", result)
 
-        if not okay:
-            LOGGER.error("Update failed: ", result["_id"])
+            if not okay:
+                LOGGER.error("Update failed: ", result["_id"])
+                
             
-        
-    #stops if we have less than QUERY_SIZE elements, it was the last response
-    if (length < QUERY_NB_RESULT):
-        break
+        #stops if we have less than QUERY_SIZE elements, it was the last response
+        if (length < QUERY_NB_RESULT):
+            break
 
 
 

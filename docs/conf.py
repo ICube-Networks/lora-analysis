@@ -9,9 +9,11 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(".."))
+
 sys.path.insert(0, "../analysis")
-#sys.path.insert(0, os.path.abspath("../tools"))
+sys.path.insert(0, "../tools")
+sys.path.insert(0, "../install")
+
 
 #import flow_distribution
 
