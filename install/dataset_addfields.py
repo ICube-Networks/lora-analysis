@@ -110,7 +110,7 @@ while True:
                 
         # has this record already extra info with the right info?
         try:
-            assert(doc['_source']['extra_infos']['version'] == loradissector.VERSION)
+            assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.VERSION)
             
         except (KeyError, AssertionError) as e:
             #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
@@ -128,7 +128,7 @@ while True:
             req_update = doc['_source']
             req_update['_index']         = myconfig.index_name
             req_update['_id']            = doc['_id']
-            req_update['extra_infos']   = loradissector.process_phypayload(doc['_source']['phyPayload'])         # use the previous doc
+            req_update['extra_infos']   = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])         # use the previous doc
             #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
               
             # insert this update to the current sequence

@@ -1,6 +1,27 @@
+""" Distribution of the durations of sessions.
+
+This script analyses the distribution of the sessions (one device
+identified by a specific DevEUI). The duration of the session is
+assumed to be the latest arrival - earliest arrival. Be careful
+a DevEUI may be associated to different devices: it is just an
+approximation.
+
+"""
+
+__authors__ = ("Fabrice Theoleyre")
+__contact__ = ("fabrice.theolerye@cnrs.fr")
+__copyright__ = "CNRS"
+__date__ = "2023"
+__version__= "1.0"
+
+
+
+
+
 # import the config folder
 import sys
 sys.path.insert(1, '../config')
+sys.path.insert(1, '../tools')
 
 # elastic search for the queries
 from elasticsearch import Elasticsearch
@@ -32,7 +53,27 @@ logging.basicConfig(stream=sys.stdout)
 
 
 
-def eq_query_session_duration(clientES, operator, field_scope, field_value):
+def es_query_session_duration(clientES, operator, field_scope, field_value):
+    """Elastic search query for a double aggregate query.
+    
+    This function sends a query to an elastic search server to retrive the doc counts
+    for two field values (fieldname1 and fieldname2), and returns the corresponding
+    pandas DataFrame
+    
+    :param Elasticsearch clientES: a connection to an elastic search server
+    
+    :param string operator: the aggregation operator (max or min) for the query which will be used on the field "field_value".
+    
+    :param dictionary field_scope: name of the elastic field to define classes (e.g., extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword to group the packets per devAddr)
+    
+    :param dictionary field_value: name of the field where the operator is applied (e.g. mqtt_time to get the max or min time for a given class)
+    
+    :returns: a pandas DataFrame which contains the duration of all
+    :rtype: DataFrame
+    """
+
+
+
     #get the number of valid records per day of the week
     resp = clientES.options(
         basic_auth=(myconfig.user, myconfig.password)
@@ -73,9 +114,17 @@ def eq_query_session_duration(clientES, operator, field_scope, field_value):
     
 # distribution of the sessions
 def plot_sessions(clientES):
-
+    """ Plot the distribution of durations.
+    
+    This function uses a pandas dataFrame to plot the distributions.
+    
+    :param Elasticsearch clientES: a connection to an elastic search server
+    
+    """
+    
+    
     #es query
-    results_df = eq_query_session_duration(clientES=clientES, operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
+    results_df = es_query_session_duration(clientES=clientES, operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
     #results_df["minmqtt_timeas_string"] = mdates.date2num(results_df["minmqtt_timeas_string"])
     results_df["session_duration"] = mdates.date2num(results_df["maxmqtt_timeas_string"]) - mdates.date2num(results_df["minmqtt_timeas_string"])
     logger_session.info(results_df)
@@ -104,21 +153,27 @@ def plot_sessions(clientES):
 
 
 
+# executable
+if __name__ == "__main__":
+    """Main function
+    
+    Executes the script to plot the distribution of the sessions (duration)
+ 
+    """
+
+
+    #elastic connection
+    DEBUG_ES = False
+    clientES = Elasticsearch(
+        "https://localhost:9200",
+        verify_certs=False,
+        ssl_show_warn=False,
+    )
+    print(clientES)
 
 
 
-#elastic connection
-DEBUG_ES = False
-clientES = Elasticsearch(
-    "https://localhost:9200",
-    verify_certs=False,
-    ssl_show_warn=False,
-)
-print(clientES)
 
-
-
-
-#plot the graphs
-plot_sessions(clientES)
+    #plot the graphs
+    plot_sessions(clientES)
 

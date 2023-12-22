@@ -116,6 +116,26 @@ class queries:
                 ]
             }
         }
+        
+        
+    
+    QUERY_ALL = {
+            "bool": {
+                "filter": [
+                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
+                    {
+                        "range":{
+                            "mqtt_time":{
+                                 "gte": "2020-09-01",
+                                 #"lte": "2020-12-30",
+                                 "format": "year_month_day",
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    
 
 ############################################################
 #           Day of the week (string) -> int

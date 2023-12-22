@@ -159,6 +159,15 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+
+#xcode project
+lora-strasbourg-analysis.xcodeproj
+
+#documentation
+docs/_*
+docs/Makefile
+
+
 #private files
 config/myconfig.py
 

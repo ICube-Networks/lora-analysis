@@ -1,6 +1,24 @@
+#!/usr/bin/env python3
+
+
+"""Temporal analysis of the traffic.
+
+Plots the distribution of traffic per day of week and per hour.
+
+"""
+
+__authors__ = ("Fabrice Theoleyre")
+__contact__ = ("fabrice.theolerye@cnrs.fr")
+__copyright__ = "CNRS"
+__date__ = "2023"
+__version__= "1.0"
+
+
+
 # import the config folder
 import sys
 sys.path.insert(1, '../config')
+sys.path.insert(1, '../tools')
 
 # elastic search for the queries
 from elasticsearch import Elasticsearch
@@ -24,10 +42,27 @@ import matplotlib.dates as mdates
 # Import seaborn
 import seaborn as sns
     
-    
-# trafic per day of week
-def plot_traffic_per_dayofweek(clientES):
+  
+SIZE_RESP_ELASTIC = 1000000
+"""
+Constant signifying the number of records to count in the query per class
 
+An aggregate query
+"""
+  
+
+def es_query_traffic_per_dayofweek(clientES):
+    """Elastic search query for a distribution of packets per day of week.
+    
+    This function sends a query to an elastic search server to retrive the distribution of traffic per day of week (i.e., Monday, etc.)
+    
+    :param Elasticsearch clientES: a connection to an elastic search server
+    
+    :returns: a pandas DataFrame which contains the result of the ES query
+    :rtype: DataFrame
+    """
+
+  
     #get the number of valid records per day of the week
     resp = clientES.options(
         basic_auth=(myconfig.user, myconfig.password)
@@ -37,22 +72,7 @@ def plot_traffic_per_dayofweek(clientES):
         request_timeout=300,
         pretty=True,
         human=True,
-        query={
-            "bool": {
-                "filter": [
-                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
-                    {
-                        "range":{
-                            "mqtt_time":{
-                                 "gte": "2020-09-01",
-                                 #"lte": "2020-12-30",
-                                 "format": "year_month_day",
-                            }
-                        }
-                    }
-                ],
-            },
-        },
+        query=tools.queries.QUERY_ALL,
         runtime_mappings={
             "day_of_week": {
                 "type": "keyword",
@@ -74,7 +94,7 @@ def plot_traffic_per_dayofweek(clientES):
                 "date-day": {
                     "terms": {
                         "field": "date-day",
-                        "size": 1000000
+                        "size": SIZE_RESP_ELASTIC
                     }
                 }
             }
@@ -84,13 +104,31 @@ def plot_traffic_per_dayofweek(clientES):
     #print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("day_of_week", "date-day"), key_as_string=False, debug=False)
-
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("day_of_week", "date-day"), key_as_string=False,)
+ 
     #mapping to sort with the day of week
-    results_df['day_of_week'] = pd.Categorical(results_df['day_of_week'], tools.dayofweek.long[:len(tools.dayofweek.long)])
-    results_df = results_df.sort_values('day_of_week')
+    results_df["day_of_week"] = pd.Categorical(results_df["day_of_week"], tools.dayofweek.long[:len(tools.dayofweek.long)])
+    results_df = results_df.sort_values("day_of_week")
+
+
+    return(results_df)
+    
+    
+    
+  
+# trafic per day of week
+def plot_traffic_per_dayofweek(clientES):
+    """Plot a distribution of traffic per day of week.
+    
+    This function plots the distribution of traffic per day of week (i.e., Monday, etc.)
+    
+    :param Elasticsearch clientES: a connection to an elastic search server
+    
+
+    """
 
     #result
+    results_df = es_query_traffic_per_dayofweek(clientES)
     print(results_df)
 
     # Create a seaborn visualization
@@ -100,7 +138,7 @@ def plot_traffic_per_dayofweek(clientES):
         data=results_df,
         kind="line",
         x="day_of_week", y="count",
-        palette="tab10",
+        #palette="tab10",
     )
     g.set(xlabel='Day of the week', ylabel='Number of packets per day')
     g.set(ylim=(0, None))
@@ -110,8 +148,19 @@ def plot_traffic_per_dayofweek(clientES):
 
 
 # trafic per hour
-def plot_traffic_per_hour(clientES):
-    #get the number of valid records per hour of the day
+def es_query_traffic_per_hour(clientES):
+    """Elastic search query for a distribution of packets per hour.
+    
+    This function sends a query to an elastic search server to retrieve the distribution of traffic per hour (0..23)
+    
+    :param Elasticsearch clientES: a connection to an elastic search server
+    
+    :returns: a pandas DataFrame which contains the result of the ES query
+    :rtype: DataFrame
+    """
+
+
+   #get the number of valid records per hour of the day
     resp = clientES.options(
         basic_auth=(myconfig.user, myconfig.password)
     ).search(
@@ -120,22 +169,7 @@ def plot_traffic_per_hour(clientES):
         request_timeout=300,
         pretty=True,
         human=True,
-        query={
-            "bool": {
-                "filter": [
-                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
-                    {
-                        "range":{
-                            "mqtt_time":{
-                                 "gte": "2020-11-01",
-                                 #"lte": "2020-11-10",
-                                 "format": "year_month_day",
-                            }
-                        }
-                    }
-                ],
-            },
-        },
+        query=tools.queries.QUERY_ALL,
         runtime_mappings={
             "hour": {
                 "type": "long",
@@ -166,7 +200,24 @@ def plot_traffic_per_hour(clientES):
    # print(resp)
     
     # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_agg_into_dataframe(es_reply= resp, agg_names=("hour", "date-day"), key_as_string=False, debug=False)
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply= resp, agg_names=("hour", "date-day"), key_as_string=False,)
+    print(results_df)
+
+
+    return(results_df)
+
+
+# trafic per hour
+def plot_traffic_per_hour(clientES):
+    """Plot a distribution of traffic per hour.
+    
+    This function plots the distribution of traffic (nb packets) per hour
+    
+    :param Elasticsearch clientES: a connection to an elastic search server
+    
+    """
+
+    results_df = es_query_traffic_per_hour(clientES=clientES)
     print(results_df)
 
     # Create a seaborn visualization
@@ -187,18 +238,23 @@ def plot_traffic_per_hour(clientES):
 
 
 
+# executable
+if __name__ == "__main__":
+    """Executes the script to plot the distribution of the number of packets per day of the week and per hour
+ 
+    """
 
 
-#elastic connection
-DEBUG_ES = False
-clientES = Elasticsearch(
-    "https://localhost:9200",
-    verify_certs=False,
-    ssl_show_warn=False,
-)
-print(clientES)
+    #elastic connection
+    DEBUG_ES = False
+    clientES = Elasticsearch(
+        "https://localhost:9200",
+        verify_certs=False,
+        ssl_show_warn=False,
+    )
+    print(clientES)
 
 
-#plot the graphs
-plot_traffic_per_dayofweek(clientES)
-plot_traffic_per_hour(clientES)
+    #plot the graphs
+    plot_traffic_per_dayofweek(clientES)
+    plot_traffic_per_hour(clientES)
