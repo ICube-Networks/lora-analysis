@@ -1,7 +1,7 @@
 # import the config folder
 import sys
 sys.path.insert(1, '../config')
-sys.path.insert(1, '../analysis')
+sys.path.insert(1, '../tools')
 
 # elastic search for the queries
 from elasticsearch import Elasticsearch
@@ -11,7 +11,7 @@ from elasticsearch.helpers import parallel_bulk
 import myconfig
 
 # dissector of LoRaWAN frames
-import loradissector
+import lorawan_dissector
 
 # my tool functions in common for the analysis
 import tools
