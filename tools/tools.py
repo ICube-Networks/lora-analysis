@@ -149,7 +149,10 @@ class queries:
     Class that regroups common elastic search queries.
      
     """
-     
+    
+   
+   
+  
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST =  {
             "bool": {
@@ -164,6 +167,41 @@ class queries:
         }
     """
     Query to match all the documents that have an extra_infos field.
+    """
+    
+      
+    # fields extra_info exist for the frame
+    QUERY_NOEXTRAINFO_EXIST =  {
+            "bool": {
+              "must_not": [
+                    {
+                      "exists": {
+                      "field": "extra_infos"
+                     }
+                  }
+                ]
+            }
+        }
+    
+    
+    """
+    Query to match all the documents that have NO extra_infos field.
+    """
+    
+    # the data frames only
+    QUERY_NODATA =  {
+            "bool": {
+              "must_not": [
+                    {
+                        "term": {
+                            "extra_infos.phyPayload.mhdr.mType": "2"
+                        }
+                     }
+                ]
+            }
+        }
+    """
+    Query to match all the documents that are NOT data packets (extra_infos mtype=2).
     """
 
     # the data frames only
@@ -180,7 +218,7 @@ class queries:
         }
     
     """
-    Query to match all the documents thatare data packets (extra_infos mtype=2).
+    Query to match all the documents that are data packets (extra_infos mtype=2).
     """
     
     QUERY_ALL = {

@@ -1,6 +1,7 @@
 """ Enrich the dataset with extrainfos fields .
 
-This scripts parses the dataset to identify records (aka docs) that do not have extrainfo fields to update them. More precisely, it decodes the LoRaWAN frames to construct the extra_info.
+This scripts parses the dataset to identify records (aka docs) that do not have extrainfo fields to update them.
+More precisely, it decodes the LoRaWAN frames to construct the extra_info.
 
 """
 
@@ -43,9 +44,6 @@ import requests, json, os, tarfile, pathlib
 from datetime import datetime
 import matplotlib.dates as mdates
 
-# Import seaborn
-import seaborn as sns
-
 #logs
 import logging
 LOGGER = logging.getLogger('dataset_decodeFrames')
@@ -54,6 +52,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
+#parameters
 QUERY_NB_RESULT = 1000
 EXTRA_INFO_VERSION = "1.0"
 
@@ -77,7 +76,7 @@ if __name__ == "__main__":
      
 
     ############################################################
-    #           CONNECTION TO ES SERVER with PIT
+    #           CONNECTION TO ES SERVER
     ############################################################
 
 
@@ -94,14 +93,14 @@ if __name__ == "__main__":
 
 
 
-    # Scroll all the documents of the elastic search index, using the PIT to scroll until the end
+    # Scroll all the documents of the elastic search index
     datemin="0"
     while True:
         #search records without the right extra info version
         response = clientES.options(
             basic_auth=(myconfig.user, myconfig.password),
         ).search(
-            index=myconfig.index_name, #no index for PIT connections
+            index=myconfig.index_name,
             size=QUERY_NB_RESULT,
             query={
                 "bool": {
