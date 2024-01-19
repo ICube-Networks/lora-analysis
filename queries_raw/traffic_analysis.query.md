@@ -210,3 +210,38 @@ The day is the period comprised between 7am and 7pm
 	    }
 	  }
 	}
+	
+	
+# Distributions
+
+
+List of first reception of a packet for each gateway ID
+
+	GET /lora-index/_search?pretty=true
+	{
+	  "size":0,
+	  "timeout": "3000s",
+	  "query": {
+		    "bool": {
+		      "must": [
+		            {
+		              "exists": {
+		              "field": "extra_infos"
+		             }
+		          }
+		        ]
+		    }
+		  },
+	  "aggs":{
+	    "devAddr": {
+	      "terms": {
+	        "field": "rxInfo.gatewayID.keyword",
+	        "size": 10000,
+	        "order": {"min_mqtt_time": "desc"}
+	      },
+	      "aggs":{
+	        "min_mqtt_time": {"min": {"field": "mqtt_time"}}
+	      }
+	    }
+	  }
+	}

@@ -83,15 +83,7 @@ if __name__ == "__main__":
 
     #elastic connection
     DEBUG_ES = False
-    clientES = Elasticsearch(
-        "https://localhost:9200",
-        verify_certs=False,
-        ssl_show_warn=False,
-        basic_auth=(myconfig.user, myconfig.password)
-    )
-    print(clientES)
-
-
+    clientES = elasticsearch_open_connection()
 
     # Scroll all the documents of the elastic search index
     datemin="0"

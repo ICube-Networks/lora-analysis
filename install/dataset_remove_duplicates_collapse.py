@@ -118,10 +118,10 @@ if __name__ == "__main__":
                 "field": "phyPayload.keyword",
                 "inner_hits": {
                     "name": "dup_packets",
-                    "size": 5,
+                    "size": 30,
                     "sort": [ { "phyPayload.keyword": "asc" } ]
                 },
-                "max_concurrent_group_searches": 5
+                "max_concurrent_group_searches": 15
             },
             #fields=[
             #    "mqtt_time",
@@ -140,9 +140,27 @@ if __name__ == "__main__":
         
         #remember the keyword for the last element
         phyPayload_min = response['hits']['hits'][length-1]['_source']['phyPayload']
-        print(phyPayload_min)
+        LOGGER.info("The max phyPayload is \""+phyPayload_min+"\"")
+       
+        for record in response.body['hits']['hits']:
 
-    
+            count = record['inner_hits']['dup_packets']['hits']['total']['value']
+
+            print(count)
+            #print(json.dumps(count, sort_keys=True, indent=4))
+            if (count > 1):
+                    #print(json.dumps(record, sort_keys=True, indent=4))
+                    
+                    print("nb = "+ str(len( record['inner_hits']['dup_packets']['hits']['hits'])))
+                    
+                    for pkt in record['inner_hits']['dup_packets']['hits']['hits']:
+                        print(pkt['mqtt_time'])
+
+        
+        
+        #print(response.body['hits']['hits'])
+                
+        exit(2)
                 
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < QUERY_NB_RESULT):

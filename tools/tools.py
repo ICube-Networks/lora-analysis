@@ -11,18 +11,28 @@ __date__ = "2023"
 __version__= "1.0"
 
 
+# import the config folder
+import sys
+sys.path.insert(1, '../config')
+sys.path.insert(1, '../tools')
 
-
+# configuration parameters
+import myconfig
 
 # numerical libraries
 import pandas as pd
 from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
-import sys
+
+# elastic search for the queries
+from elasticsearch import Elasticsearch
+from elasticsearch.helpers import streaming_bulk
+from elasticsearch.helpers import parallel_bulk
+
 
 #logs
 import logging
 logger_tool = logging.getLogger('tools')
-logger_tool.setLevel(logging.WARN)
+logger_tool.setLevel(logging.ERROR)
 
 
 
@@ -241,6 +251,66 @@ class queries:
     Query to match any document corresponding to a correctly received LoRa frame.
     """
 
+
+############################################################
+#           ELASTIC SEARCH
+############################################################
+
+
+def elasticsearch_open_connection():
+
+    """
+    Open a connection to the elastic search server
+    
+    """
+    
+    #elastic connection
+    DEBUG_ES = False
+    clientES = Elasticsearch(
+        "https://localhost:9200",
+        verify_certs=False,
+        ssl_show_warn=False,
+        basic_auth=(myconfig.user, myconfig.password)
+    )
+    #print(clientES)
+    logger_tool.info(clientES.info())
+    
+    return(clientES)
+
+
+
+def elasticsearch_create_pit(clientES):
+    """
+    Create a PIT for an existing elastic search connection
+    
+    """
+    
+    result = clientES.open_point_in_time(
+        index=myconfig.index_name,
+        keep_alive="10m"
+    )
+
+    return(result['id'])
+
+
+
+def elasticsearch_push_updates(bulk_update):
+    """
+    Pushes a list of updates to the elastic search server
+ 
+    """
+    
+    clientES_update = elasticsearch_open_connection()
+   
+    #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
+    for okay, result in parallel_bulk(client=clientES_update, actions=bulk_update, chunk_size=10000, thread_count=4):
+        action, result = result.popitem()
+        
+        logger_tool.debug("action: ", action)
+        logger_tool.debug("result: ", result)
+
+        if not okay:
+            logger_tool.error("Update failed: ", result["_id"])
 
 
 ############################################################
