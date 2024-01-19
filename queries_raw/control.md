@@ -44,7 +44,7 @@ to clone lora-index into lora-index-short (working copy)
 
 
 
-# entry with its id
+# search for an entry
 
 
 To get an entry with its id
@@ -66,3 +66,26 @@ To get an entry with its id
 		    }
 		  }
 	}
+	
+	
+	
+To get an entry with its Phy payload
+
+	
+
+	GET /lora-index-short/_search?pretty=true
+		{
+		  "size": 10,
+		  "timeout": "3000s",
+		  "query": {
+			    "bool": {
+			       "must": [
+			         {
+		            "term": {
+		                    "phyPayload.keyword": "QPXn2g6A4LUCf+qViIUpWAM4gQYUZvK82tsc"
+		                }
+			         }
+		          ]
+			    }
+			  }
+		}

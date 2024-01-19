@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """ Enrich the dataset with extrainfos fields .
 
 This scripts parses the dataset to identify records (aka docs) that do not have extrainfo fields to update them.
@@ -83,7 +85,7 @@ if __name__ == "__main__":
 
     #elastic connection
     DEBUG_ES = False
-    clientES = elasticsearch_open_connection()
+    clientES = tools.elasticsearch_open_connection()
 
     # Scroll all the documents of the elastic search index
     datemin="0"
@@ -113,6 +115,7 @@ if __name__ == "__main__":
         length = len(response['hits']['hits'])
         #print("length:", length)
         if (length == 0):
+            LOGGER.info("No remaining entry without the right extra_infos field (version=" + EXTRA_INFO_VERSION + ")")
             break
         
         
@@ -163,8 +166,10 @@ if __name__ == "__main__":
             
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < QUERY_NB_RESULT):
+            LOGGER.info("No remaining entry without the right extra_infos field (version=" + EXTRA_INFO_VERSION + ")")
+            LOGGER.info("Last bulk contained " + str(length) + " entries")
             break
 
 
-
-
+clientES.transport.close()
+exit(0)

@@ -312,6 +312,8 @@ def elasticsearch_push_updates(bulk_update):
         if not okay:
             logger_tool.error("Update failed: ", result["_id"])
 
+    clientES.transport.close()
+
 
 ############################################################
 #           Day of the week (string) -> int

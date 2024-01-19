@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """ Enrich the dataset with dup_infos fields .
 
 This scripts parses the dataset to identify duplicates
@@ -133,6 +135,7 @@ def get_first_time_window():
     next_min = last_record - timedelta(minutes=OFFSET_MINUTES_MAX)
     mqtt_time_min = datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH)
     
+    clientES.transport.close()    
     return(mqtt_time_min)
 
 
@@ -212,6 +215,7 @@ if __name__ == "__main__":
 
 
 clientES.close_point_in_time(id=pit_id)
+clientES.transport.close()
 exit(0)
   
     
