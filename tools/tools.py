@@ -1,6 +1,6 @@
-""" Tools common for elastic search manipulations.
+""" Tools for elastic search manipulations.
 
-This module loads a few specific tools to help for elastic search.
+This module loads a few specific tools to help for elastic search queries.
 
 """
 
@@ -272,7 +272,6 @@ def elasticsearch_open_connection():
         ssl_show_warn=False,
         basic_auth=(myconfig.user, myconfig.password)
     )
-    #print(clientES)
     logger_tool.info(clientES.info())
     
     return(clientES)
@@ -300,10 +299,10 @@ def elasticsearch_push_updates(bulk_update):
  
     """
     
-    clientES_update = elasticsearch_open_connection()
+    clientES = elasticsearch_open_connection()
    
     #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-    for okay, result in parallel_bulk(client=clientES_update, actions=bulk_update, chunk_size=10000, thread_count=4):
+    for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=1000, thread_count=4):
         action, result = result.popitem()
         
         logger_tool.debug("action: ", action)
@@ -313,6 +312,8 @@ def elasticsearch_push_updates(bulk_update):
             logger_tool.error("Update failed: ", result["_id"])
 
     clientES.transport.close()
+
+
 
 
 ############################################################

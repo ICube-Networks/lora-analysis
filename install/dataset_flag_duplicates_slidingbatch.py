@@ -39,7 +39,7 @@ import flask
 
 #logs
 import logging
-LOGGER = logging.getLogger('dataset_remove_duplicates')
+LOGGER = logging.getLogger('dataset_flag_duplicates')
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
@@ -88,7 +88,6 @@ def create_updated_entries(response):
             #logger.DEBUG("--> ok (is_duplicate) (id = " + record['_id'] + ")")
     
         except (KeyError, AssertionError) as e:
-
 
             # info on duplicates
             dup_infos = {}
@@ -207,7 +206,7 @@ if __name__ == "__main__":
         if len(bulk_update) > 0:
             tools.elasticsearch_push_updates(bulk_update)
         else:
-            LOGGER.info("No update")
+            LOGGER.info("No update in this time window (" + mqtt_time_min + "/" + last_record + ")")
         
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < QUERY_NB_RESULT):
