@@ -19,6 +19,9 @@ sys.path.insert(1, '../tools')
 # configuration parameters
 import myconfig
 
+# json
+import json
+
 # numerical libraries
 import pandas as pd
 from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
@@ -32,7 +35,7 @@ from elasticsearch.helpers import parallel_bulk
 #logs
 import logging
 logger_tool = logging.getLogger('tools')
-logger_tool.setLevel(logging.ERROR)
+logger_tool.setLevel(logging.INFO)
 
 
 
@@ -74,8 +77,8 @@ def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, fie
     
     #last recursive call, save the value (doc_count) in the tuple, and push the tuple into the dataframe
     if(depth == len(agg_names)):
-        logger_tool.info("--last depth----")
-        logger_tool.info(es_reply)
+        logger_tool.debug("--last depth----")
+        logger_tool.debug(es_reply)
         tuple['count'] = [es_reply['doc_count']]
         
         # the parameter is not an empty string: store as well the corresponding value
@@ -94,16 +97,16 @@ def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, fie
         return(results_df)
 
     #debug
-    logger_tool.info("-----------------")
-    logger_tool.info("depth:" + str(depth))
-    logger_tool.info(" agg_names=" + agg_names[depth])
-    logger_tool.info(es_reply)
-    logger_tool.info("-----------------")
+    logger_tool.debug("-----------------")
+    logger_tool.debug("depth:" + str(depth))
+    logger_tool.debug(" agg_names=" + agg_names[depth])
+    logger_tool.debug(es_reply)
+    logger_tool.debug("-----------------")
 
     #keep on walking recursively in the aggregated reply
     for elem in es_reply[agg_names[depth]]["buckets"]:
-        logger_tool.info("----- elem -------")
-        logger_tool.info(elem)
+        logger_tool.debug("----- elem -------")
+        logger_tool.debug(elem)
     
         # store the corresponding value for this tuple
         tuple[agg_names[depth]] = [elem['key']]
@@ -131,7 +134,7 @@ def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_values="", key_a
     :rtype: DataFrame
     """
         
-    logger_tool.info("Start analysis")
+    logger_tool.debug("Start analysis")
     
        
     #panda dataframe
@@ -141,8 +144,8 @@ def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_values="", key_a
     #walk in the response of elastic search with the aggregated fields
     results_df = elasticsearch_walk_aggrep(es_reply=es_reply["aggregations"], agg_names=agg_names, depth=0, results_df=results_df, tuple=tuple, field_values=field_values, key_as_string=key_as_string)
     
-    logger_tool.info("Start analysis")
-    logger_tool.info(results_df)
+    logger_tool.debug("Start analysis")
+    logger_tool.debug(results_df)
         
     return(results_df)
 
@@ -332,7 +335,7 @@ def elasticsearch_open_connection():
         ssl_show_warn=False,
         basic_auth=(myconfig.user, myconfig.password)
     )
-    logger_tool.info(clientES.info())
+    logger_tool.debug(clientES.info())
     
     return(clientES)
 
@@ -360,6 +363,10 @@ def elasticsearch_push_updates(bulk_update):
     """
     
     clientES = elasticsearch_open_connection()
+   
+
+    logger_tool.debug(json.dumps(bulk_update, sort_keys=True, indent=4))
+
    
     #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
     for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=1000, thread_count=4):
