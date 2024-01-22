@@ -39,7 +39,6 @@ import numpy as np
 
 # format
 import requests, json, os, tarfile, pathlib
-from datetime import datetime
 import matplotlib.dates as mdates
 
 # Import seaborn
@@ -53,7 +52,7 @@ logging.basicConfig(stream=sys.stdout)
 
 
 
-def es_query_session_duration(clientES, operator, field_scope, field_value):
+def es_query_session_duration(operator, field_scope, field_value):
     """Elastic search query for a double aggregate query.
     
     This function sends a query to an elastic search server to retrive the doc counts
@@ -72,6 +71,9 @@ def es_query_session_duration(clientES, operator, field_scope, field_value):
     :rtype: DataFrame
     """
 
+    
+    # open the connection to the elastic search server
+    clientES = tools.elasticsearch_open_connection()
 
 
     #get the number of valid records per day of the week
@@ -98,7 +100,8 @@ def es_query_session_duration(clientES, operator, field_scope, field_value):
             }
           }
     )
-    
+    clientES.transport.close()
+
     # transform the aggregation results into a pandas' dataframe
     results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(field_scope, ), field_values=(operator+field_value, "max"+field_value), key_as_string=False)
     
@@ -112,18 +115,16 @@ def es_query_session_duration(clientES, operator, field_scope, field_value):
  
     
 # distribution of the sessions
-def plot_sessions(clientES):
+def plot_sessions():
     """ Plot the distribution of durations.
     
     This function uses a pandas dataFrame to plot the distributions.
-    
-    :param Elasticsearch clientES: a connection to an elastic search server
-    
+        
     """
     
     
     #es query
-    results_df = es_query_session_duration(clientES=clientES, operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
+    results_df = es_query_session_duration(operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
     #results_df["minmqtt_timeas_string"] = mdates.date2num(results_df["minmqtt_timeas_string"])
     results_df["session_duration"] = mdates.date2num(results_df["maxmqtt_timeas_string"]) - mdates.date2num(results_df["minmqtt_timeas_string"])
     logger_session.info(results_df)
@@ -160,19 +161,6 @@ if __name__ == "__main__":
  
     """
 
-
-    #elastic connection
-    DEBUG_ES = False
-    clientES = Elasticsearch(
-        "https://localhost:9200",
-        verify_certs=False,
-        ssl_show_warn=False,
-    )
-    print(clientES)
-
-
-
-
     #plot the graphs
-    plot_sessions(clientES)
+    plot_sessions()
 

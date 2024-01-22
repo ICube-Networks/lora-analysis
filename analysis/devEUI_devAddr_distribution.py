@@ -35,8 +35,7 @@ import numpy as np
 
 # format
 import requests, json, os, tarfile, pathlib
-from datetime import datetime
-import matplotlib.dates as mdates
+
 
 # Import seaborn
 import seaborn as sns
@@ -50,12 +49,11 @@ logging.basicConfig(stream=sys.stdout)
 
 
 
-def es_query_count_for_field(clientES, params):
+def es_query_count_for_field(params):
     """ Elastic search query for a double aggregate query.
     
     This function sends a query to an elastic search server to retrive the doc counts for two field values (fieldname1 and fieldname2), and returns the corresponding pandas DataFrame
     
-    :param Elasticsearch clientES: a connection to an elastic search server
     
     :param dictionary params: a list of two field names (with the keys fieldname1 and fieldname2) to construct the elastic search query
     
@@ -63,6 +61,7 @@ def es_query_count_for_field(clientES, params):
     :rtype: DataFrame
     """
 
+    clientES = tools.elasticsearch_open_connection()
 
     #get the number of valid records per day of the week
     resp = clientES.options(
@@ -96,6 +95,8 @@ def es_query_count_for_field(clientES, params):
     # transform the aggregation results into a pandas' dataframe
     results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(params['fieldname1'],params['fieldname2']), key_as_string=False)
     
+    # close the elastic connection
+    clientES.transport.close()
     
     if results_df.empty:
         logger_flow.critical("Empty pandaframe")
@@ -109,7 +110,7 @@ def es_query_count_for_field(clientES, params):
 
     
 # trafic per day of week
-def plot_pkt_per_flow(clientES):
+def plot_pkt_per_flow():
     """Plot the graph for the flow distribution.
     
     Generates two seaborn plots:
@@ -141,7 +142,7 @@ def plot_pkt_per_flow(clientES):
 
     for params in params_list:
         #es query
-        results_df = es_query_count_for_field(clientES=clientES, params=params)
+        results_df = es_query_count_for_field(params=params)
         print(results_df)
         
         
@@ -174,19 +175,6 @@ if __name__ == "__main__":
  
     """
     
-    
-    #elastic connection
-    DEBUG_ES = False
-    clientES = Elasticsearch(
-        "https://localhost:9200",
-        verify_certs=False,
-        ssl_show_warn=False,
-    )
-    print(clientES)
-
-
-
-
     #plot the graphs
-    plot_pkt_per_flow(clientES)
+    plot_pkt_per_flow()
 

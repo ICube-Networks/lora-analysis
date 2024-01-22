@@ -36,7 +36,6 @@ import numpy as np
 
 # format
 import requests, json, os, tarfile, pathlib
-from datetime import datetime
 import matplotlib.dates as mdates
 
 # Import seaborn
@@ -244,17 +243,13 @@ if __name__ == "__main__":
  
     """
 
-
-    #elastic connection
-    DEBUG_ES = False
-    clientES = Elasticsearch(
-        "https://localhost:9200",
-        verify_certs=False,
-        ssl_show_warn=False,
-    )
-    print(clientES)
-
+        
+    # open the connection to the elastic search server
+    clientES = tools.elasticsearch_open_connection()
 
     #plot the graphs
     plot_traffic_per_dayofweek(clientES)
     plot_traffic_per_hour(clientES)
+    
+    
+    clientES.transport.close()
