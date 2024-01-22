@@ -83,8 +83,7 @@ def es_query_session_duration(clientES, operator, field_scope, field_value):
         request_timeout=3000,
         pretty=True,
         human=True,
-        #query=tools.queries.QUERY_EXTRAINFO_EXIST,
-        query=tools.queries.QUERY_DATA,
+        query=tools.queries.QUERY_DATA_NODUP,
         aggs={
             field_scope: {
               "terms": {

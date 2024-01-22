@@ -79,21 +79,7 @@ def  es_query_SF(clientES):
         index=myconfig.index_name,
         size=0,
         request_timeout=300,
-        query={
-            "bool": {
-                "filter": [
-                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
-                    {
-                        "range":{
-                            "mqtt_time":{
-                                "gte": "2020-09-01",
-                                "format": "year_month_day",
-                            }
-                        }
-                    }
-                ],
-            },
-        },
+        query=tools.queries.QUERY_ALL_NODUP,
         aggs={
             "SF": {
                 "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" },

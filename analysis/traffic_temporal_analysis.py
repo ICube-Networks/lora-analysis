@@ -72,7 +72,7 @@ def es_query_traffic_per_dayofweek(clientES):
         request_timeout=300,
         pretty=True,
         human=True,
-        query=tools.queries.QUERY_ALL,
+        query=tools.queries.QUERY_ALL_NODUP,
         runtime_mappings={
             "day_of_week": {
                 "type": "keyword",
@@ -169,7 +169,7 @@ def es_query_traffic_per_hour(clientES):
         request_timeout=300,
         pretty=True,
         human=True,
-        query=tools.queries.QUERY_ALL,
+        query=tools.queries.QUERY_ALL_NODUP,
         runtime_mappings={
             "hour": {
                 "type": "long",

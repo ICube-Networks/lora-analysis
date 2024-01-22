@@ -179,7 +179,27 @@ class queries:
     Query to match all the documents that have an extra_infos field.
     """
     
-      
+    # fields extra_info exist for the frame
+    QUERY_EXTRAINFO_EXIST_NODUP =  {
+            "bool": {
+              "filter" : [
+                    {"match": {"dup_infos.is_duplicate": False}},
+
+              ],
+              "must": [
+                    {
+                      "exists": {
+                      "field": "extra_infos"
+                     }
+                  }
+                ]
+            }
+        }
+    """
+    Query to match all the documents that have an extra_infos field.
+    """
+    
+
     # fields extra_info exist for the frame
     QUERY_NOEXTRAINFO_EXIST =  {
             "bool": {
@@ -230,7 +250,28 @@ class queries:
     """
     Query to match all the documents that are data packets (extra_infos mtype=2).
     """
+    # the data frames only
+    QUERY_DATA_NODUP =  {
+            "bool": {
+              "filter" : [
+                    {"match": {"dup_infos.is_duplicate": False}},
+
+              ],
+              "must": [
+                    {
+                        "term": {
+                            "extra_infos.phyPayload.mhdr.mType": "2"
+                        }
+                     }
+                ]
+            }
+        }
     
+    """
+    Query to match all the documents that are data packets (extra_infos mtype=2), removing duplicates.
+    """
+
+
     QUERY_ALL = {
             "bool": {
                 "filter": [
@@ -250,7 +291,26 @@ class queries:
     """
     Query to match any document corresponding to a correctly received LoRa frame.
     """
-
+    
+    QUERY_ALL_NODUP = {
+            "bool": {
+                "filter": [
+                    {"match": {"rxInfo.crcStatus": "CRC_OK"}},
+                    {"match": {"dup_infos.is_duplicate": False}},
+                    {
+                        "range":{
+                            "mqtt_time":{
+                                 "gte": "2020-09-01",
+                                 "format": "year_month_day",
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    """
+    Query to match any document corresponding to a correctly received LoRa frame.
+    """
 
 ############################################################
 #           ELASTIC SEARCH
