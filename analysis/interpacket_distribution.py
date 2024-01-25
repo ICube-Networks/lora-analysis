@@ -40,12 +40,13 @@ import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 
 
-# Import seaborn
+# Data science and co
 import seaborn as sns
+import pandas as pd
    
 #logs
 import logging
-logger_interpkt = logging.getLogger('intetrpkt_distribution')
+logger_interpkt = logging.getLogger('interpkt_distribution')
 logger_interpkt.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
@@ -75,12 +76,10 @@ def es_query_get_devAddr(clientES):
     list_devAddr = []
     while True:
     
-        response = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password)
-        ).search(
+        response = clientES.search(
             index=myconfig.index_name,
             size=0,
-            request_timeout=3000,
+            #request_timeout=3000,
             pretty=True,
             human=True,
             query=tools.queries.QUERY_DATA_NODUP,
@@ -133,7 +132,7 @@ def es_query_get_devAddr(clientES):
  
    
 
-def eq_query_get_interpkt(clientES, devAddr):
+def eq_query_get_interpkt(clientES, devAddr, with_distribution=False):
     """ Elastic query to get the list of inter packet time for a given devAddr
         
     :param clientES is an active connection to an elastic search server
@@ -154,12 +153,9 @@ def eq_query_get_interpkt(clientES, devAddr):
     mqtt_time_min = 0
     while True:
     
-        response = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password)
-        ).search(
+        response = clientES.search(
             index=myconfig.index_name,
             size=QUERY_NB_RESULT,
-            request_timeout=3000,
             pretty=True,
             human=True,
             query={
@@ -205,29 +201,95 @@ def eq_query_get_interpkt(clientES, devAddr):
         # next page for the query
         mqtt_time_min = response['hits']['hits'][length-1]['fields']['mqtt_time'][0]
        
-    logger_interpkt.debug(devAddr + " -> ", list_interpkt_time)
-    logger_interpkt.info(devAddr + " -> " + str(len(list_interpkt_time)))
+    #logger_interpkt.info(devAddr + " -> ", list_interpkt_time)
+    logger_interpkt.debug(devAddr + " (list size) -> " + str(len(list_interpkt_time)))
 
+    # convert the list into a series
+    pd_distrib = pd.Series(list_interpkt_time)
     
-        
-        
+    #saves the results
+    record = {}
+    record['devAddr'] = devAddr
+    record['median_interpkt_time'] = pd_distrib.median()
+    record['nb_pkts'] = len(list_interpkt_time)
+    if with_distribution is True:
+        record['distribution'] = pd_distrib
+    else:
+        record['distribution'] = None
+
+
+    return(record)
+
+
+def plot_distribution(pd_stats):
+    #live view of the distributions for each packet
+    sns.set()
+    sns.set_theme()
+
+     
+    #get the last entry
+    x = pd_stats.loc[len(pd_stats.index)-1]['distribution'].array
+    print("-------")
+    print(x.seconds)
+    print("-------")
+    
+    g = sns.ecdfplot(
+        x.seconds,
+        #stats="time",
+    )
+    g.set(xlabel='Inter packet time (s)', ylabel='Proportion')
+    g.set(xlim=(0, 10000))
+
+    fig = g.figure.savefig("figures/test.pdf")
+    g.figure.clf()
+         
+    
+    
+    
+    
 # executable
 if __name__ == "__main__":
     """Executes the script to analyze the distribution of inter packet times
  
     """
     
+    
+    
     clientES = tools.elasticsearch_open_connection()
 
     #get the list of devaddrs in the elastic search DB
     list_devAddr = es_query_get_devAddr(clientES)
 
+
+    #stats
+    pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
+    pd_stats['distribution'] = pd.Series(dtype='object')
+
+    i = 0
+    logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
+
+
     #get the inter packet times for a given devAddr
     for devAddr in list_devAddr :
-        eq_query_get_interpkt(clientES, devAddr)
-     
-     
+        i = i+1
+        record = eq_query_get_interpkt(clientES, devAddr, with_distribution=True)
+        pd_stats.loc[len(pd_stats.index)] = record
+        logger_interpkt.debug(record['devAddr'] + "  " + str(record['median_interpkt_time']) + "     " + str(record['nb_pkts']))
+        
+        # stats
+        logger_interpkt.info("memory: "+ str(sys.getsizeof(pd_stats) / (1024 * 1024)) + " MB")
+        plot_distribution(pd_stats)
+   
+        if i > 10:
+            break
+
+        
     clientES.transport.close()
 
 
+
+
+
+
+print(pd_stats)
 #save the pandas dataframe into parcket / pickle / feather / XX csv XX

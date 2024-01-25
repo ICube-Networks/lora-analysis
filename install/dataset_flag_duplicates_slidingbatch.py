@@ -109,9 +109,7 @@ def create_updated_entries(response):
 def get_first_time_window():
     clientES = tools.elasticsearch_open_connection()
  
-    response = clientES.options(
-        basic_auth=(myconfig.user, myconfig.password),
-    ).search(
+    response = clientES.search(
         pit={
             "id": pit_id,
             "keep_alive": "10m",
@@ -166,9 +164,7 @@ if __name__ == "__main__":
     
         # Search and Sort the entries chronologically (MUST include the records already handled
         # Else impossible to detect duplicates between those handled those not handled)
-        response = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password),
-        ).search(
+        response = clientES.search(
             pit={
                 "id": pit_id,
                 "keep_alive": "10m",
@@ -189,7 +185,7 @@ if __name__ == "__main__":
         #remember the date of the last entry in the response
         last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], DATE_FORMAT_ELASTICSEARCH)
         next_min = last_record - timedelta(minutes=OFFSET_MINUTES_MAX)
-        LOGGER.info(mqtt_time_min + " --> " + datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH))
+        LOGGER.debug(mqtt_time_min + " --> " + datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH))
 
         #bug if the next time is before the previous one (the time window cannot contain all the packets in the same query)
         if next_min <= datetime.strptime(mqtt_time_min, DATE_FORMAT_ELASTICSEARCH):
