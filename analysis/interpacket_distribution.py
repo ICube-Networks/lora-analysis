@@ -33,6 +33,7 @@ import tools
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 # format
 import requests, json, os, tarfile, pathlib
@@ -50,6 +51,12 @@ logger_interpkt = logging.getLogger('interpkt_distribution')
 logger_interpkt.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
+# system
+import signal
+import time
+
+# storage
+import pyarrow.feather as feather
 
 
 # parameters
@@ -57,6 +64,8 @@ DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 AGG_OFFSET = 1000      # offset for the pagination in the aggregatied query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 QUERY_NB_RESULT = 10000         #  number of results for our elastic search queries
+CTRL_C_PRESSED = False      # has ctrl-c been pressed?
+
 
 
 
@@ -132,7 +141,7 @@ def es_query_get_devAddr(clientES):
  
    
 
-def eq_query_get_interpkt(clientES, devAddr, with_distribution=False):
+def eq_query_get_interpkt(clientES, devAddr):
     """ Elastic query to get the list of inter packet time for a given devAddr
         
     :param clientES is an active connection to an elastic search server
@@ -189,8 +198,8 @@ def eq_query_get_interpkt(clientES, devAddr, with_distribution=False):
         for i in range(0, len(response["hits"]["hits"])  - 1):
             
             list_interpkt_time.append(
-                datetime.strptime(response["hits"]["hits"][i+1]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)\
-                -\
+                datetime.strptime(response["hits"]["hits"][i+1]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH) \
+                - \
                 datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
             )
         
@@ -212,40 +221,151 @@ def eq_query_get_interpkt(clientES, devAddr, with_distribution=False):
     record['devAddr'] = devAddr
     record['median_interpkt_time'] = pd_distrib.median()
     record['nb_pkts'] = len(list_interpkt_time)
-    if with_distribution is True:
-        record['distribution'] = pd_distrib
-    else:
-        record['distribution'] = None
+
+    return(record, pd_distrib)
 
 
-    return(record)
 
-
-def plot_distribution(pd_stats):
-    #live view of the distributions for each packet
+def plot_distribution_grid(pd_frame, index, count, nb_cols):
+    """ Plot a list of distributions (timeseries) from a pandas dataframe with an ECDF
+        
+    :param distribution: a pandas dataframe containing a distribution (pandas series) for each row
+    
+    """
     sns.set()
     sns.set_theme()
+    sns.set(font_scale=0.5)
 
-     
-    #get the last entry
-    x = pd_stats.loc[len(pd_stats.index)-1]['distribution'].array
-    print("-------")
-    print(x.seconds)
-    print("-------")
+    #a grid of plots
+    fig, axs = plt.subplots(ncols=nb_cols, nrows=math.ceil(count/nb_cols))
+
+    #live view of the distributions for each packet
+    for g_id in range(index, index+count):
     
-    g = sns.ecdfplot(
-        x.seconds,
-        #stats="time",
-    )
-    g.set(xlabel='Inter packet time (s)', ylabel='Proportion')
-    g.set(xlim=(0, 10000))
-
+        print(str(g_id % nb_cols) + " / " + str(math.floor(g_id / nb_cols)))
+        
+        g = sns.ecdfplot(
+            pd_frame.iloc[g_id]['distribution'].array.seconds,
+            ax=axs[math.floor(g_id / nb_cols), g_id % nb_cols]
+            
+        )
+        g.set(xlabel='Inter pkt time (s) / '+str(pd_frame.iloc[g_id]['distribution'].size) + ' pkts', ylabel='Proportion')
+        #g.set(xlim=(0, 2000))
+        
+    plt.tight_layout()
     fig = g.figure.savefig("figures/test.pdf")
     g.figure.clf()
          
+         
+
     
     
     
+
+def plot_distribution_unique(pd_frame):
+    """ Plot a distribution (pd dataframe) with an ECDF
+        
+    :param distribution: a pandas dataframe with the data to plot
+    
+    """
+    sns.set()
+    sns.set_theme()
+    sns.set(font_scale=1.0)
+
+      
+    g = sns.ecdfplot(
+        pd_frame / pd.Timedelta(seconds=1)
+    )
+    g.set(xlabel='Inter pkt time (s)', ylabel='Proportion')
+    #g.set(xlim=(0, 2000))
+    
+    fig = g.figure.savefig("figures/test2.pdf")
+    g.figure.clf()
+         
+         
+
+  
+    
+ 
+ 
+class Application:
+    """ Class to define the application to run (for the analysis)
+    We can stop the application with a ctrl-c  since the number of flows is very high
+    
+    """
+
+    def __init__( self ):
+        signal.signal(signal.SIGINT, lambda signal, frame: self._signal_handler() )
+        self.terminated = False
+
+
+    def _signal_handler( self ):
+        self.terminated = True
+        
+        
+    def handler(signum, frame):
+        """ Ctrl-c has been pressed
+            
+        :param signum: signal id
+        
+        :param frame
+        
+        """
+        
+        print("")
+        print("Ctrl-c was pressed. Will stop the program and generate the plots")
+        print("")
+        CTRL_C_PRESSED = True
+
+
+    def MainLoop( self ):
+        clientES = tools.elasticsearch_open_connection()
+
+        #get the list of devaddrs in the elastic search DB
+        list_devAddr = es_query_get_devAddr(clientES)
+
+
+        #stats
+        pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
+        pd_stats['distribution'] = pd.Series(dtype='object')
+
+        i = 0
+        logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
+
+
+        #get the inter packet times for a given devAddr
+        for devAddr in list_devAddr :
+            i = i+1
+            record, distribution = eq_query_get_interpkt(clientES, devAddr)
+            record['distribution'] = distribution
+            pd_stats.loc[len(pd_stats.index)] = record
+            
+            #debug
+            logger_interpkt.debug(record['devAddr'] + "  " + str(record['median_interpkt_time']) + "     " + str(record['nb_pkts']))
+            
+            # stats
+            logger_interpkt.info("memory: "+ str(sys.getsizeof(pd_stats) / (1024 * 1024)) + " MB")
+       
+            #exit condition
+            if self.terminated:
+                print("Break it")
+                break
+
+
+        # plot a grid of distributions (invidividual analysis)
+        nb_plots = max(25, pd_stats.size)
+        #plot_distribution_grid(pd_stats, index=0, count=nb_plots, nb_cols=5)
+        
+        # plot the EDCF of the median inter packet time
+        #plot_distribution_unique(pd_stats['median_interpkt_time'])
+        
+        #clean up
+        clientES.transport.close()
+
+        #save the pandas dataframe into parquet / pickle / feather / XX csv XX
+        pd_stats.to_feather('data/dataset.gzip')
+
+
     
 # executable
 if __name__ == "__main__":
@@ -253,43 +373,15 @@ if __name__ == "__main__":
  
     """
     
+    # encapsulated in a class to be able to stop the computation with a ctrl-c
+    app = Application()
+    app.MainLoop()
     
-    
-    clientES = tools.elasticsearch_open_connection()
-
-    #get the list of devaddrs in the elastic search DB
-    list_devAddr = es_query_get_devAddr(clientES)
-
-
-    #stats
-    pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
-    pd_stats['distribution'] = pd.Series(dtype='object')
-
-    i = 0
-    logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
-
-
-    #get the inter packet times for a given devAddr
-    for devAddr in list_devAddr :
-        i = i+1
-        record = eq_query_get_interpkt(clientES, devAddr, with_distribution=True)
-        pd_stats.loc[len(pd_stats.index)] = record
-        logger_interpkt.debug(record['devAddr'] + "  " + str(record['median_interpkt_time']) + "     " + str(record['nb_pkts']))
-        
-        # stats
-        logger_interpkt.info("memory: "+ str(sys.getsizeof(pd_stats) / (1024 * 1024)) + " MB")
-        plot_distribution(pd_stats)
    
-        if i > 10:
-            break
 
-        
-    clientES.transport.close()
+    
+ 
 
 
 
 
-
-
-print(pd_stats)
-#save the pandas dataframe into parcket / pickle / feather / XX csv XX
