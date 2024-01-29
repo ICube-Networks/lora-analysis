@@ -61,12 +61,17 @@ import pyarrow.feather as feather
 
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
-AGG_OFFSET = 1000      # offset for the pagination in the aggregatied query
+AGG_OFFSET = 1000                   # offset for the pagination in the aggregatied query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
-QUERY_NB_RESULT = 10000         #  number of results for our elastic search queries
-CTRL_C_PRESSED = False      # has ctrl-c been pressed?
+QUERY_NB_RESULT = 10000                #  number of results for our elastic search queries
+CTRL_C_PRESSED = False              # has ctrl-c been pressed?
+FILENAME_DF = 'data/dataset.parquet'   # the name of the file to read/write the data frames
+FILENAME_DISTRIB = 'data/distrib_'  # the prefix of the filenames for the distribution
 
-
+      
+# --------------------------------------------------------
+#       ELASTIC SEARCH QUERIES
+# --------------------------------------------------------
 
 
 def es_query_get_devAddr(clientES):
@@ -225,6 +230,12 @@ def eq_query_get_interpkt(clientES, devAddr):
     return(record, pd_distrib)
 
 
+      
+# --------------------------------------------------------
+#       PLOTS
+# --------------------------------------------------------
+
+
 
 def plot_distribution_grid(pd_frame, index, count, nb_cols):
     """ Plot a list of distributions (timeseries) from a pandas dataframe with an ECDF
@@ -282,11 +293,77 @@ def plot_distribution_unique(pd_frame):
     fig = g.figure.savefig("figures/test2.pdf")
     g.figure.clf()
          
-         
+      
+      
+      
+# --------------------------------------------------------
+#       DISK PRESISTENT STORAGE
+# --------------------------------------------------------
 
-  
+
+def save_to_disk(pd_stats):
+    """ Save to disk the dataframe (with parquet)
+        
+    :param pd_stats: the pandas dataframe
+    4 columns:
+    devAddr: string
+    median_interpkt_time: delta_time
+    nb_pkt: integer
+    distributions: series
+    """
+
+    #save the pandas dataframe into parquet / pickle / feather / XX csv XX
+    print("size " + str(len(pd_stats)))
     
- 
+    print("-----------")
+    #save each distribution in a separated file
+    for index in range(0, len(pd_stats)):
+        #print(pd_stats.loc[index])
+        #print("-----------")
+        #print(pd_stats.loc[index].notnull()['distribution'])
+        #print("-----------")
+
+        # if the key distribution is not NaN, it means we need to save it (not already on the disk)
+        if pd_stats.loc[index].notnull()['distribution'] :
+            pd_stats.loc[index]['distribution'].to_frame().to_parquet(FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet')
+            logger_interpkt.info("saving distribution for " + pd_stats.loc[index]['devAddr'])
+            print("------------")
+        
+
+    pd_stats.loc[:, pd_stats.columns != "distribution"].to_parquet(FILENAME_DF)
+     
+  
+  
+  
+  
+def load_from_disk():
+    """ Load from disk the dataframe (with parquet)
+        
+    :return pd_stats: the pandas dataframe
+    3 columns:
+    devAddr: string
+    median_interpkt_time: delta_time
+    nb_pkt: integer
+    
+    """
+    pd_stats = None
+
+    if  os.path.exists(FILENAME_DF):
+        logger_interpkt.info(" load parquet data from " + FILENAME_DF)
+        pd_stats = pd.read_parquet(FILENAME_DF)
+    else:
+        logger_interpkt.info(FILENAME_DF + " doesn't exist.")
+
+    return(pd_stats)
+     
+     
+     
+     
+     
+# --------------------------------------------------------
+#       APPLICATION (INTERRUPTABLE)
+# --------------------------------------------------------
+
  
 class Application:
     """ Class to define the application to run (for the analysis)
@@ -297,6 +374,10 @@ class Application:
     def __init__( self ):
         signal.signal(signal.SIGINT, lambda signal, frame: self._signal_handler() )
         self.terminated = False
+        
+        #stats
+        self.pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
+        self.pd_stats['distribution'] = pd.Series(dtype='object')
 
 
     def _signal_handler( self ):
@@ -319,52 +400,49 @@ class Application:
 
 
     def MainLoop( self ):
+        """ Ask for all the packets for each devAddr to store info in a pandas dataframe
+                    
+        """
+
+
         clientES = tools.elasticsearch_open_connection()
 
         #get the list of devaddrs in the elastic search DB
         list_devAddr = es_query_get_devAddr(clientES)
-
-
-        #stats
-        pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
-        pd_stats['distribution'] = pd.Series(dtype='object')
-
-        i = 0
-        logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
+        
+        # remove the devAddr already handled
+        for i in range(0, len(self.pd_stats)) :
+              list_devAddr.remove(self.pd_stats.iloc[i]['devAddr'])
 
 
         #get the inter packet times for a given devAddr
+        logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
         for devAddr in list_devAddr :
-            i = i+1
+
             record, distribution = eq_query_get_interpkt(clientES, devAddr)
             record['distribution'] = distribution
-            pd_stats.loc[len(pd_stats.index)] = record
+            self.pd_stats.loc[len(self.pd_stats.index)] = record
             
             #debug
-            logger_interpkt.debug(record['devAddr'] + "  " + str(record['median_interpkt_time']) + "     " + str(record['nb_pkts']))
-            
-            # stats
-            logger_interpkt.info("memory: "+ str(sys.getsizeof(pd_stats) / (1024 * 1024)) + " MB")
-       
+            logger_interpkt.info(record['devAddr'] + "  " + str(record['median_interpkt_time']) + "     " + str(record['nb_pkts']))
+            logger_interpkt.debug("memory: "+ str(sys.getsizeof(self.pd_stats) / (1024 * 1024)) + " MB")
+ 
             #exit condition
             if self.terminated:
                 print("Break it")
                 break
 
-
-        # plot a grid of distributions (invidividual analysis)
-        nb_plots = max(25, pd_stats.size)
-        #plot_distribution_grid(pd_stats, index=0, count=nb_plots, nb_cols=5)
-        
-        # plot the EDCF of the median inter packet time
-        #plot_distribution_unique(pd_stats['median_interpkt_time'])
-        
         #clean up
         clientES.transport.close()
 
-        #save the pandas dataframe into parquet / pickle / feather / XX csv XX
-        pd_stats.to_feather('data/dataset.gzip')
+        #return(self.pd_stats)
 
+      
+      
+      
+# --------------------------------------------------------
+#       MAIN
+# --------------------------------------------------------
 
     
 # executable
@@ -373,15 +451,26 @@ if __name__ == "__main__":
  
     """
     
+    
     # encapsulated in a class to be able to stop the computation with a ctrl-c
     app = Application()
+    
+    # load data that is on the disk (already read previously)
+    pd_disk = load_from_disk()
+    if pd_disk is not None:
+        app.pd_stats = pd.concat([app.pd_stats, pd_disk])
+            
+    # read the rest (starting from what has been read on the disk)
     app.MainLoop()
-    
-   
-
-    
  
-
-
-
-
+    #plots
+    if False:
+        # plot a grid of distributions (invidividual analysis)
+        nb_plots = max(25, app.pd_stats.size)
+        plot_distribution_grid(app.pd_stats, index=0, count=nb_plots, nb_cols=5)
+        
+        # plot the EDCF of the median inter packet time
+        plot_distribution_unique(app.pd_stats['median_interpkt_time'])
+            
+    # save the pandas frame to the disk
+    save_to_disk(app.pd_stats)

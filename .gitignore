@@ -173,6 +173,7 @@ config/myconfig.py
 
 #datasets
 install/data*/*
+analysis/data/*
 
 # node js installation
 node_modules/*
