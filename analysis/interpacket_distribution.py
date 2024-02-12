@@ -61,6 +61,8 @@ import pyarrow.feather as feather
 
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
+NB_PKTS_MIN = 5                     # minimum number of packets for a given devAddr (else discarded) to compute the median value
+
 AGG_OFFSET = 1000                   # offset for the pagination in the aggregatied query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 QUERY_NB_RESULT = 10000                #  number of results for our elastic search queries
@@ -126,7 +128,7 @@ def es_query_get_devAddr(clientES):
         
         # no more record
         if (len(response["aggregations"]["devAddr"]["buckets"]) == 0):
-            logger_interpkt.info("no more page in the aggregate query")
+            logger_interpkt.info("Elastic search: last page for the aggregate query")
             break;
         
         
@@ -201,12 +203,11 @@ def eq_query_get_interpkt(clientES, devAddr):
       
         # computes the inter packet time
         for i in range(0, len(response["hits"]["hits"])  - 1):
-            
-            list_interpkt_time.append(
-                datetime.strptime(response["hits"]["hits"][i+1]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH) \
+            diff = datetime.strptime(response["hits"]["hits"][i+1]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH) \
                 - \
                 datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
-            )
+
+            list_interpkt_time.append(diff.total_seconds())
         
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < QUERY_NB_RESULT):
@@ -220,14 +221,24 @@ def eq_query_get_interpkt(clientES, devAddr):
 
     # convert the list into a series
     pd_distrib = pd.Series(list_interpkt_time)
-    
+     
     #saves the results
-    record = {}
-    record['devAddr'] = devAddr
-    record['median_interpkt_time'] = pd_distrib.median()
-    record['nb_pkts'] = len(list_interpkt_time)
-
-    return(record, pd_distrib)
+    if len(list_interpkt_time) > 0:
+        record = {
+            'devAddr': [devAddr,],
+            'median_interpkt_time': [pd_distrib.median(),],
+            'nb_pkts': [len(list_interpkt_time) + 1,],         # number of packets = length of the list + one
+            'distribution': [pd_distrib,]
+        }
+    else:
+        record = {
+            'devAddr': [devAddr,],
+            'median_interpkt_time': [pd.NaT,],
+            'nb_pkts': [len(list_interpkt_time) + 1,] ,        # number of packets = length of the list + one
+            'distribution': [pd.NaT,]
+        }
+    
+    return(pd.DataFrame(data=record))
 
 
       
@@ -237,7 +248,7 @@ def eq_query_get_interpkt(clientES, devAddr):
 
 
 
-def plot_distribution_grid(pd_frame, index, count, nb_cols):
+def plot_distribution_grid(pd_frame, index_min, count, nb_cols):
     """ Plot a list of distributions (timeseries) from a pandas dataframe with an ECDF
         
     :param distribution: a pandas dataframe containing a distribution (pandas series) for each row
@@ -249,22 +260,44 @@ def plot_distribution_grid(pd_frame, index, count, nb_cols):
 
     #a grid of plots
     fig, axs = plt.subplots(ncols=nb_cols, nrows=math.ceil(count/nb_cols))
+        
 
     #live view of the distributions for each packet
-    for g_id in range(index, index+count):
+    for g_id in range(index_min, index_min+count):
     
-        print(str(g_id % nb_cols) + " / " + str(math.floor(g_id / nb_cols)))
+        col = (g_id - index_min) % nb_cols
+        row = math.floor((g_id - index_min) / nb_cols)
         
-        g = sns.ecdfplot(
-            pd_frame.iloc[g_id]['distribution'].array.seconds,
-            ax=axs[math.floor(g_id / nb_cols), g_id % nb_cols]
-            
-        )
-        g.set(xlabel='Inter pkt time (s) / '+str(pd_frame.iloc[g_id]['distribution'].size) + ' pkts', ylabel='Proportion')
-        #g.set(xlim=(0, 2000))
+        #not enough packets -> nothing to plot
+        if pd_frame.iloc[g_id]['nb_pkts'] < 2:
+            continue
+        
+        # several rows in the plots
+        if (count > nb_cols):
+            g = sns.ecdfplot(
+                pd_frame.iloc[g_id]['distribution'].array,
+                ax=axs[row, col]
+                
+            )
+        #one single row
+        elif count > 1:
+            g = sns.ecdfplot(
+                pd_frame.iloc[g_id]['distribution'].array,
+                ax=axs[col]
+                
+            )
+        #one single plot
+        else:
+             g = sns.ecdfplot(
+                pd_frame.iloc[g_id]['distribution'].array
+            )
+
+        g.set(xlabel=str(pd_frame.iloc[g_id]['distribution'].size)+" pkts/@="+pd_frame.iloc[g_id]['devAddr'], ylabel='Proportion')
+
+        g.set(xlim=(0, np.max(pd_frame.iloc[g_id]['distribution'].array)))
         
     plt.tight_layout()
-    fig = g.figure.savefig("figures/test.pdf")
+    fig = g.figure.savefig("figures/interpkt_time_distributions.pdf")
     g.figure.clf()
          
          
@@ -281,58 +314,24 @@ def plot_distribution_unique(pd_frame):
     """
     sns.set()
     sns.set_theme()
-    sns.set(font_scale=1.0)
-
+    sns.set(font_scale=0.8)
       
     g = sns.ecdfplot(
-        pd_frame / pd.Timedelta(seconds=1)
+        pd_frame #/ pd.Timedelta(seconds=1)
     )
     g.set(xlabel='Inter pkt time (s)', ylabel='Proportion')
-    #g.set(xlim=(0, 2000))
+
     
-    fig = g.figure.savefig("figures/test2.pdf")
+    fig = g.figure.savefig("figures/interpkt_time_median_distribution.pdf")
     g.figure.clf()
          
-      
-      
+       
       
 # --------------------------------------------------------
 #       DISK PRESISTENT STORAGE
 # --------------------------------------------------------
 
 
-def save_to_disk(pd_stats):
-    """ Save to disk the dataframe (with parquet)
-        
-    :param pd_stats: the pandas dataframe
-    4 columns:
-    devAddr: string
-    median_interpkt_time: delta_time
-    nb_pkt: integer
-    distributions: series
-    """
-
-    #save the pandas dataframe into parquet / pickle / feather / XX csv XX
-    print("size " + str(len(pd_stats)))
-    
-    print("-----------")
-    #save each distribution in a separated file
-    for index in range(0, len(pd_stats)):
-        #print(pd_stats.loc[index])
-        #print("-----------")
-        #print(pd_stats.loc[index].notnull()['distribution'])
-        #print("-----------")
-
-        # if the key distribution is not NaN, it means we need to save it (not already on the disk)
-        if pd_stats.loc[index].notnull()['distribution'] :
-            pd_stats.loc[index]['distribution'].to_frame().to_parquet(FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet')
-            logger_interpkt.info("saving distribution for " + pd_stats.loc[index]['devAddr'])
-            print("------------")
-        
-
-    pd_stats.loc[:, pd_stats.columns != "distribution"].to_parquet(FILENAME_DF)
-     
-  
   
   
   
@@ -349,17 +348,53 @@ def load_from_disk():
     pd_stats = None
 
     if  os.path.exists(FILENAME_DF):
-        logger_interpkt.info(" load parquet data from " + FILENAME_DF)
+        logger_interpkt.info(" Load parquet data from " + FILENAME_DF)
         pd_stats = pd.read_parquet(FILENAME_DF)
+        pd_stats['distribution'] = pd.Series(dtype='object')
+        pd_stats['nb_pkts'] = pd_stats['nb_pkts'].astype('int')
     else:
         logger_interpkt.info(FILENAME_DF + " doesn't exist.")
 
+ 
+              
+              
+              
     return(pd_stats)
      
      
      
      
+  
+def save_to_disk(pd_stats):
+    """ Save to disk the dataframe (with parquet)
+        
+    :param pd_stats: the pandas dataframe
+    4 columns:
+    devAddr: string
+    median_interpkt_time: delta_time
+    nb_pkt: integer
+    distributions: series
+    """
+
+    
+    #save each distribution in a separated file (parquet format)
+    logger_interpkt.info("Saving individual distributions for ("+ str(len(pd_stats)) +" records): ")
+    for index in range(0, len(pd_stats)):
+        
+        # if the key distribution is not NaN, it means we need to save it (not already on the disk)
+        if pd_stats.loc[index].notnull()['distribution'] :
+            pd_stats.loc[index]['distribution'].to_frame().to_parquet(FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet')
+            logger_interpkt.info(" " + pd_stats.loc[index]['devAddr'])
+
+    # savings the dataframe without the individual distributions
+    pd_stats.loc[:, pd_stats.columns != "distribution"].to_parquet(FILENAME_DF)
      
+  
+  
+  
+  
+  
+  
 # --------------------------------------------------------
 #       APPLICATION (INTERRUPTABLE)
 # --------------------------------------------------------
@@ -371,34 +406,25 @@ class Application:
     
     """
 
-    def __init__( self ):
+    def __init__( self, pd_stats ):
+        """ Creation of the app object
+        
+        """
         signal.signal(signal.SIGINT, lambda signal, frame: self._signal_handler() )
         self.terminated = False
         
         #stats
-        self.pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
-        self.pd_stats['distribution'] = pd.Series(dtype='object')
-
+        self.pd_stats = pd_stats
+ 
 
     def _signal_handler( self ):
+        """ Ctrl-c has been pressed
+        
+        """
         self.terminated = True
         
         
-    def handler(signum, frame):
-        """ Ctrl-c has been pressed
-            
-        :param signum: signal id
-        
-        :param frame
-        
-        """
-        
-        print("")
-        print("Ctrl-c was pressed. Will stop the program and generate the plots")
-        print("")
-        CTRL_C_PRESSED = True
-
-
+  
     def MainLoop( self ):
         """ Ask for all the packets for each devAddr to store info in a pandas dataframe
                     
@@ -410,33 +436,54 @@ class Application:
         #get the list of devaddrs in the elastic search DB
         list_devAddr = es_query_get_devAddr(clientES)
         
+        # empty pandas dataframe -> let's create it
+        if self.pd_stats is  None:
+            self.pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
+            self.pd_stats['distribution'] = pd.Series(dtype='object')
+
         # remove the devAddr already handled
-        for i in range(0, len(self.pd_stats)) :
-              list_devAddr.remove(self.pd_stats.iloc[i]['devAddr'])
+        else:
+            for i in range(0, len(self.pd_stats)) :
+                list_devAddr.remove(self.pd_stats.iloc[i]['devAddr'])
 
 
         #get the inter packet times for a given devAddr
         logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
         for devAddr in list_devAddr :
 
-            record, distribution = eq_query_get_interpkt(clientES, devAddr)
-            record['distribution'] = distribution
-            self.pd_stats.loc[len(self.pd_stats.index)] = record
+            pd_record = eq_query_get_interpkt(clientES, devAddr)
+   
+            print(pd_record)
+            #print(pd_record.shape)
+            #print("--------")
+            #print(self.pd_stats)
+            #print(self.pd_stats.shape)
             
+            
+            self.pd_stats = pd.concat([self.pd_stats, pd_record], ignore_index=True)
+
+
+            #debug for nan values (series with 1 packet only)
+            #if pd_record.loc[len(pd_record.index)-1]['nb_pkts'] <= 1:
+            #    self.terminated = True
+                
             #debug
-            logger_interpkt.info(record['devAddr'] + "  " + str(record['median_interpkt_time']) + "     " + str(record['nb_pkts']))
+            logger_interpkt.info(
+                pd_record.loc[len(pd_record.index)-1]['devAddr']
+                + "  " +
+                str(pd_record.loc[len(pd_record.index)-1]['median_interpkt_time'])
+                + "     " +
+                str(pd_record.loc[len(pd_record.index)-1]['nb_pkts'])
+            )
             logger_interpkt.debug("memory: "+ str(sys.getsizeof(self.pd_stats) / (1024 * 1024)) + " MB")
  
             #exit condition
             if self.terminated:
-                print("Break it")
+                print("------- Application interrupted ----- ")
                 break
 
         #clean up
         clientES.transport.close()
-
-        #return(self.pd_stats)
-
       
       
       
@@ -451,26 +498,41 @@ if __name__ == "__main__":
  
     """
     
-    
-    # encapsulated in a class to be able to stop the computation with a ctrl-c
-    app = Application()
-    
+      
+    # ---- disk -----
     # load data that is on the disk (already read previously)
     pd_disk = load_from_disk()
     if pd_disk is not None:
-        app.pd_stats = pd.concat([app.pd_stats, pd_disk])
-            
-    # read the rest (starting from what has been read on the disk)
+        size_from_disk = len(pd_disk)
+    else:
+        size_from_disk = 0
+    
+    # -- elastic search ----
+    # extract from elastic search what was not read on the disk
+    # encapsulated in a class to be able to stop the computation with a ctrl-c
+    app = Application(pd_disk)
     app.MainLoop()
  
-    #plots
-    if False:
-        # plot a grid of distributions (invidividual analysis)
-        nb_plots = max(25, app.pd_stats.size)
-        plot_distribution_grid(app.pd_stats, index=0, count=nb_plots, nb_cols=5)
-        
-        # plot the EDCF of the median inter packet time
-        plot_distribution_unique(app.pd_stats['median_interpkt_time'])
-            
+    # --- plots ---
+    # plot a grid of distributions (invidividual analysis)
+    nb_plots = min(25, len(app.pd_stats) - size_from_disk)
+    nb_cols = math.ceil(math.sqrt(nb_plots))
+    plot_distribution_grid(app.pd_stats, index_min=size_from_disk, count=nb_plots, nb_cols=nb_cols)
+    
+    # plot the EDCF of the median inter packet time (remove samples with not enough packets)
+    print(
+        "LENGTH::: " +
+        str(len(app.pd_stats[(app.pd_stats.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time']))
+        + " / " +
+        str(len(app.pd_stats))
+    )
+    
+    plot_distribution_unique(app.pd_stats[(app.pd_stats.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time'])
+                    
+    # ---- disk -----
     # save the pandas frame to the disk
     save_to_disk(app.pd_stats)
+
+
+
+
