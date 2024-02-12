@@ -403,12 +403,15 @@ def save_to_disk(pd_stats):
     for index in range(0, len(pd_stats)):
         
         # if the key distribution is not NaN, it means we need to save it (not already on the disk)
-        #if pd_stats.loc[index].notnull()['distribution'] :
         filename = FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet'
-
         
         logger_interpkt.info(" " + pd_stats.loc[index]['devAddr'])
-        pd_stats.loc[index, 'distribution'].to_frame().to_parquet(filename)
+        print(pd_stats.loc[index, 'distribution'])
+   
+        if pd_stats.loc[index].notnull()['distribution'] :
+            pd_stats.loc[index, 'distribution'].to_frame().to_parquet(filename)
+        else:
+            pd.DataFrame([np.nan]).to_parquet(filename)
 
 
 
