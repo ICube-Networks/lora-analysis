@@ -348,9 +348,27 @@ def load_from_disk():
     pd_stats = None
 
     if  os.path.exists(FILENAME_DF):
-        logger_interpkt.info(" Load parquet data from " + FILENAME_DF)
+        logger_interpkt.info(" Loading parquet data from " + FILENAME_DF + ":")
         pd_stats = pd.read_parquet(FILENAME_DF)
+        
+        
+        # add an empty distribution column (4th column)
         pd_stats['distribution'] = pd.Series(dtype='object')
+                    
+                    
+        #load each individual distribution
+        index = 0
+        for index in list(pd_stats.index):
+            filename = FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet'
+            if os.path.exists(filename):
+                pd_stats.at[index, 'distribution'] = pd.read_parquet(filename).squeeze()
+                logger_interpkt.info("\t" + pd_stats.loc[index, 'devAddr'])
+
+            else:
+                logger_interpkt.error(filename + " doesn't exist")
+                pd_stats = pd_stats.drop([index])
+            
+        # force some types in the pandaframe
         pd_stats['nb_pkts'] = pd_stats['nb_pkts'].astype('int')
     else:
         logger_interpkt.info(FILENAME_DF + " doesn't exist.")
@@ -371,25 +389,29 @@ def save_to_disk(pd_stats):
     :param pd_stats: the pandas dataframe
     4 columns:
     devAddr: string
-    median_interpkt_time: delta_time
+    median_interpkt_time: float (seconds)
     nb_pkt: integer
-    distributions: series
+    distributions: series of inter packet time (float seconds)
     """
 
     
+    # savings séparately the dataframe without the individual distributions p(arquet format)
+    pd_stats.loc[:, pd_stats.columns != "distribution"].to_parquet(FILENAME_DF)
+     
     #save each distribution in a separated file (parquet format)
     logger_interpkt.info("Saving individual distributions for ("+ str(len(pd_stats)) +" records): ")
     for index in range(0, len(pd_stats)):
         
         # if the key distribution is not NaN, it means we need to save it (not already on the disk)
-        if pd_stats.loc[index].notnull()['distribution'] :
-            pd_stats.loc[index]['distribution'].to_frame().to_parquet(FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet')
-            logger_interpkt.info(" " + pd_stats.loc[index]['devAddr'])
+        #if pd_stats.loc[index].notnull()['distribution'] :
+        filename = FILENAME_DISTRIB + pd_stats.loc[index]['devAddr'] + '.parquet'
 
-    # savings the dataframe without the individual distributions
-    pd_stats.loc[:, pd_stats.columns != "distribution"].to_parquet(FILENAME_DF)
-     
-  
+        
+        logger_interpkt.info(" " + pd_stats.loc[index]['devAddr'])
+        pd_stats.loc[index, 'distribution'].to_frame().to_parquet(filename)
+
+
+
   
   
   
@@ -441,6 +463,7 @@ class Application:
             self.pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': [], 'distribution': []})
             self.pd_stats['distribution'] = pd.Series(dtype='object')
 
+
         # remove the devAddr already handled
         else:
             for i in range(0, len(self.pd_stats)) :
@@ -448,34 +471,17 @@ class Application:
 
 
         #get the inter packet times for a given devAddr
-        logger_interpkt.debug("devAddr   median_interpkt_time       nb_pkts      distribution")
+        logger_interpkt.info("Reading values ....")
+        logger_interpkt.info("\tdevAddr\t\tnb_pkts\t\tmedian_interpkt_time")
         for devAddr in list_devAddr :
 
+            # get the new record for this devAddr
             pd_record = eq_query_get_interpkt(clientES, devAddr)
-   
-            print(pd_record)
-            #print(pd_record.shape)
-            #print("--------")
-            #print(self.pd_stats)
-            #print(self.pd_stats.shape)
-            
-            
-            self.pd_stats = pd.concat([self.pd_stats, pd_record], ignore_index=True)
-
-
-            #debug for nan values (series with 1 packet only)
-            #if pd_record.loc[len(pd_record.index)-1]['nb_pkts'] <= 1:
-            #    self.terminated = True
-                
-            #debug
-            logger_interpkt.info(
-                pd_record.loc[len(pd_record.index)-1]['devAddr']
-                + "  " +
-                str(pd_record.loc[len(pd_record.index)-1]['median_interpkt_time'])
-                + "     " +
-                str(pd_record.loc[len(pd_record.index)-1]['nb_pkts'])
-            )
+            logger_interpkt.info("\t" + pd_record['devAddr'][0] + "\t" + str(pd_record['nb_pkts'][0]) + "\t\t" + str(pd_record['median_interpkt_time'][0])   )
             logger_interpkt.debug("memory: "+ str(sys.getsizeof(self.pd_stats) / (1024 * 1024)) + " MB")
+
+            # concantenated to the global pandaframe
+            self.pd_stats = pd.concat([self.pd_stats, pd_record], ignore_index=True)
  
             #exit condition
             if self.terminated:
@@ -506,6 +512,7 @@ if __name__ == "__main__":
         size_from_disk = len(pd_disk)
     else:
         size_from_disk = 0
+
     
     # -- elastic search ----
     # extract from elastic search what was not read on the disk
