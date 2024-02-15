@@ -8,7 +8,7 @@ More precisely, it decodes the LoRaWAN frames to construct the extra_info.
 """
 
 __authors__ = ("Fabrice Theoleyre")
-__contact__ = ("fabrice.theolerye@cnrs.fr")
+__contact__ = ("fabrice.theoleyre@cnrs.fr")
 __copyright__ = "CNRS"
 __date__ = "2023"
 __version__= "1.0"
