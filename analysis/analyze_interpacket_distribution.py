@@ -98,7 +98,7 @@ def plot_distribution_grid(pd_frame, plot_list, count, nb_cols):
          
         # several rows in the plots
         pd_distrib = extract_interpacket_distribution.load_distrib_from_disk(pd_frame.iloc[plot_list[g_id]]['devAddr'])
-        print(pd_distrib)
+        #print(pd_distrib)
         if (count > nb_cols):
             g = sns.ecdfplot(
                 pd_distrib['interpkt_time'].array,
@@ -121,7 +121,7 @@ def plot_distribution_grid(pd_frame, plot_list, count, nb_cols):
         g.set(xlabel=str(pd_distrib['interpkt_time'].size)+" pkts/@="+pd_frame.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
 
         g.set(xlim=(0, np.max(pd_distrib['interpkt_time'].array)))
-        print("g_id=" + str(plot_list[g_id]) + ", max=" + str(np.max(pd_distrib['interpkt_time'].array)))
+        print("g_id=" + str(plot_list[g_id]) + ", devAddr=" + pd_frame.iloc[plot_list[g_id]]['devAddr'] + ", max=" + str(np.max(pd_distrib['interpkt_time'].array)))
         
     plt.tight_layout(pad=0.4, h_pad=None, w_pad=None)
     #plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
 
 
-    print(pd_interpk)
+    #print(pd_interpk)
     #print(pd_interpk.iloc[2]['distribution'].to_string())
     #print(pd_interpk.iloc[2]['fCnt'].to_string())
 
