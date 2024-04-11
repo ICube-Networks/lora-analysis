@@ -341,7 +341,6 @@ def save_distrib_to_disk(pd_distrib, devAddr):
     """
      
     filename_distrib = FILENAME_DISTRIB + devAddr + '.parquet'
-    logger_interpkt.info(" " + devAddr)
     
     # if only one packet -> nan, else store the timeseries in individual files
     if pd_distrib.size > 0 :
