@@ -32,6 +32,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import scipy.stats
 
 # format
 from datetime import datetime, timedelta
@@ -58,10 +59,11 @@ import extract_interpacket_distribution
 
 
 #parameters
-NB_PKTS_MIN = 25     # minimum number of packets for a given devAddr (else discarded) to compute the median value
-NB_PLOTS = 25       # number of plots for individual distributions
+NB_PKTS_MIN = 25        # minimum number of packets for a given devAddr (else discarded) to compute the median value
+NB_PLOTS = 25           # number of plots for individual distributions
+INTERPKTIME_MAX = 10**4 # maxium interpacket time considered when plotting the correlation nbpkts / inter packet time
 
-          
+
 # --------------------------------------------------------
 #       PLOTS
 # --------------------------------------------------------
@@ -146,7 +148,7 @@ def plot_distribution_unique(pd_frame):
         pd_frame,
         log_scale=True
     )
-    g.set(xlabel='Inter pkt time (seconds)', ylabel='Proportion')
+    g.set(xlabel='Inter pkt time', ylabel='Proportion')
     
     # remove values under 1s from the x-coordinates
     g.set(xlim=(1, pd_frame.max()))
@@ -163,6 +165,47 @@ def plot_distribution_unique(pd_frame):
     g.figure.clf()
          
      
+     
+def plot_interpkt_nbpkts(pd_frame):
+    """ Plot the interpacket time vs. the number of packets of the flow
+    to see the correlation
+        
+    :param distribution: a pandas dataframe with the data to plot
+    
+    """
+    
+    sns.set()
+    sns.set_theme(style='whitegrid')
+    sns.set(font_scale=1)
+
+
+    #g = sns.scatterplot(
+    #    x="median_interpkt_time",
+    #    y="nb_pkts",
+    #    data=pd_frame
+    #    )
+    g = sns.pairplot(
+        pd_frame,
+        diag_kind="kde",
+    #   corner=True,
+    #    diag_kind="hist",
+    )
+    g.map_lower(sns.kdeplot, levels=4, color=".2")
+    
+    #save figure
+    g.figure.savefig("figures/interpkttime_nbpkts_correlation.pdf")
+    g.figure.clf()
+  
+    r,p = scipy.stats.pearsonr(pd_frame["median_interpkt_time"], pd_frame["nb_pkts"])
+    logger_interpkt.info('correlation coefficient =' + str(r))
+    logger_interpkt.info('p-value = ' + str(p))
+    
+
+
+
+
+
+
 # --------------------------------------------------------
 #       MAIN
 # --------------------------------------------------------
@@ -213,8 +256,6 @@ if __name__ == "__main__":
     pd_interpk = extract_interpacket_distribution.load_from_disk()
     logger_interpkt.info("> done!")
 
-
-
     #print(pd_interpk)
     #print(pd_interpk.iloc[2]['distribution'].to_string())
     #print(pd_interpk.iloc[2]['fCnt'].to_string())
@@ -225,13 +266,17 @@ if __name__ == "__main__":
     nb_plots = min(NB_PLOTS, len(pd_interpk))
     nb_cols = math.ceil(math.sqrt(nb_plots))
     plot_list = random.choices(range(0,len(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)])-1), k=nb_plots)
-    plot_distribution_grid(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)], plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
-    
-    # plot the EDCF of the median inter packet time (remove samples with not enough packets)
-    plot_distribution_unique(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time'])
+    #plot_distribution_grid(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)], plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
+
 
     #info
     logger_interpkt.info("Analysis: " + str(len(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time'])) + " / " +  str(len(pd_interpk)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
+
+    # plot the EDCF of the median inter packet time (remove samples with not enough packets)
+    plot_distribution_unique(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time'])
+
+    #correlation inter pkt time / nb packets
+    plot_interpkt_nbpkts(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN) & (pd_interpk.nb_pkts <= 4000 ) & (pd_interpk.median_interpkt_time <= INTERPKTIME_MAX)])
 
     
 #0f9aa96f : distribution en escalier
