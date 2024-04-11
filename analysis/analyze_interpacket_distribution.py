@@ -81,7 +81,6 @@ def plot_distribution_grid(pd_frame, plot_list, count, nb_cols):
     #a grid of plots
     fig, axs = plt.subplots(ncols=nb_cols, nrows=math.ceil(count/nb_cols))
         
-
     #live view of the distributions for each packet
     for g_id in range(0, len(plot_list)-1):
     
@@ -98,19 +97,21 @@ def plot_distribution_grid(pd_frame, plot_list, count, nb_cols):
          
         # several rows in the plots
         pd_distrib = extract_interpacket_distribution.load_distrib_from_disk(pd_frame.iloc[plot_list[g_id]]['devAddr'])
-        #print(pd_distrib)
+         
+        #convert into minues
+        pd_distrib['interpkt_time'] = pd_distrib['interpkt_time']/3600
+        
+
         if (count > nb_cols):
             g = sns.ecdfplot(
                 pd_distrib['interpkt_time'].array,
                 ax=axs[row, col]
-                
             )
         #one single row
         elif count > 1:
             g = sns.ecdfplot(
                 pd_distrib['interpkt_time'].array,
                 ax=axs[col]
-                
             )
         #one single plot
         else:
@@ -118,19 +119,16 @@ def plot_distribution_grid(pd_frame, plot_list, count, nb_cols):
                 pd_distrib['interpkt_time'].array
             )
 
-        g.set(xlabel=str(pd_distrib['interpkt_time'].size)+" pkts/@="+pd_frame.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
-
+        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time'].size)+" pkts/@="+pd_frame.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
         g.set(xlim=(0, np.max(pd_distrib['interpkt_time'].array)))
-        print("g_id=" + str(plot_list[g_id]) + ", devAddr=" + pd_frame.iloc[plot_list[g_id]]['devAddr'] + ", max=" + str(np.max(pd_distrib['interpkt_time'].array)))
         
-    plt.tight_layout(pad=0.4, h_pad=None, w_pad=None)
-    #plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-    fig = g.figure.savefig("figures/interpkt_time_distributions.pdf")
+        #debug
+        logger_interpkt.info("g_id=" + str(plot_list[g_id]) + ", devAddr=" + pd_frame.iloc[plot_list[g_id]]['devAddr'] + ", max=" + str(np.max(pd_distrib['interpkt_time'].array)))
+        
+    plt.tight_layout(pad=0.8, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/interpkt_time_distributions.pdf")
     g.figure.clf()
-         
-         
 
-    
     
     
 
@@ -142,15 +140,26 @@ def plot_distribution_unique(pd_frame):
     """
     sns.set()
     sns.set_theme()
-    sns.set(font_scale=0.8)
+    sns.set(font_scale=1)
       
     g = sns.ecdfplot(
-        pd_frame #/ pd.Timedelta(seconds=1)
+        pd_frame,
+        log_scale=True
     )
-    g.set(xlabel='Inter pkt time (s)', ylabel='Proportion')
-
+    g.set(xlabel='Inter pkt time (seconds)', ylabel='Proportion')
     
-    fig = g.figure.savefig("figures/interpkt_time_median_distribution.pdf")
+    # remove values under 1s from the x-coordinates
+    g.set(xlim=(1, pd_frame.max()))
+    
+    #label with the typical units of time
+    values = [1, 60, 3600, 86400, 604800, 2419200]
+    labels = ["1s", "1min", "1h", "1d", "1w", "1m" ]
+    g.set_xticks(values, labels=labels)
+    
+    
+    #save figure
+    plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/interpkt_time_median_distribution.pdf")
     g.figure.clf()
          
      
