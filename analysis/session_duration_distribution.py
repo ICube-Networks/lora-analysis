@@ -147,7 +147,7 @@ def plot_sessions():
     #axes.xaxis.set_major_locator(locator)
     #axes.xaxis.set_major_formatter(formatter)
     
-    fig = g.figure.savefig('figures/session_distribution.pdf')
+    fig = g.figure.savefig('figures/session_duration_distribution.pdf')
     g.figure.clf()
 
 

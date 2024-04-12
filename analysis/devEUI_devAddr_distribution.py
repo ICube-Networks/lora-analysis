@@ -129,14 +129,14 @@ def plot_pkt_per_flow():
         'fieldname1' : 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
         'fieldname2' : 'rxInfo.gatewayID.keyword',
         'xlabel' : 'Number of packets per devAddr',
-        'figname' : 'figures/traffic_distribution_per_devAddr.pdf'
+        'figname' : 'figures/devAddr_traffic_distribution.pdf'
         })
     #parameters of the query for devEUI
     params_list.append({
         'fieldname1' : 'extra_infos.phyPayload.macPayload.devEUI.keyword',
         'fieldname2' : 'rxInfo.gatewayID.keyword',
         'xlabel' : 'Number of packets per devEUI',
-        'figname' : 'figures/traffic_distribution_per_devEUI.pdf'
+        'figname' : 'figures/devEUI_traffic_distrib.pdf'
         })
 
 

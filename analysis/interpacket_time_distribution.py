@@ -54,7 +54,7 @@ logging.basicConfig(stream=sys.stdout)
 
     
 # read distributions from the disk
-import extract_interpacket_distribution
+import ../preproc.extract_interpacket_distribution
 
 
 
@@ -128,7 +128,7 @@ def plot_distribution_grid(pd_frame, plot_list, count, nb_cols):
         logger_interpkt.info("g_id=" + str(plot_list[g_id]) + ", devAddr=" + pd_frame.iloc[plot_list[g_id]]['devAddr'] + ", max=" + str(np.max(pd_distrib['interpkt_time'].array)))
         
     plt.tight_layout(pad=0.8, h_pad=None, w_pad=None)
-    g.figure.savefig("figures/interpkt_time_distributions.pdf")
+    g.figure.savefig("figures/interpkt_time_distribution_collection.pdf")
     g.figure.clf()
 
     
@@ -161,7 +161,7 @@ def plot_distribution_unique(pd_frame):
     
     #save figure
     plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
-    g.figure.savefig("figures/interpkt_time_median_distribution.pdf")
+    g.figure.savefig("figures/interpkt_time_distribution_median.pdf")
     g.figure.clf()
          
      

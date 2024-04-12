@@ -146,7 +146,7 @@ def get_first_time_window():
 # executable
 if __name__ == "__main__":
     """
-    Executes the script to plot the histogram of the number of packets per SF
+    Executes the script to pinsert duplicate info in the elastic search dataset
  
     """
 
