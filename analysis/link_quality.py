@@ -69,14 +69,14 @@ def  es_query_packets():
         index=myconfig.index_name,
         size=10000,
         request_timeout=300,
-        query=tools.queries.QUERY_DATA_NODUP,
+        query=tools.queries.QUERY_DATA,
         source=False,
         fields=[
             "rxInfo.rssi",
             "rxInfo.loRaSNR",
             "rxInfo.crcStatus",
             "txInfo.loRaModulationInfo.spreadingFactor",
-            "txInfo.loRaModulationInfo.codeRate",
+ #           "txInfo.loRaModulationInfo.codeRate",
             "dup_infos.is_duplicate",
         ]
     )
@@ -95,7 +95,7 @@ def  es_query_packets():
         "fields.rxInfo.loRaSNR": "loRaSNR",
         "fields.rxInfo.crcStatus": "crcStatus",
         "fields.txInfo.loRaModulationInfo.spreadingFactor": "spreadingFactor",
-        "fields.txInfo.loRaModulationInfo.codeRate": "codeRate",
+ #       "fields.txInfo.loRaModulationInfo.codeRate": "codeRate",
         "fields.dup_infos.is_duplicate": "is_duplicate",
     }, errors="raise")
 
@@ -104,9 +104,11 @@ def  es_query_packets():
     results_df = results_df.explode('loRaSNR')
     results_df = results_df.explode('crcStatus')
     results_df = results_df.explode('spreadingFactor')
-    results_df = results_df.explode('codeRate')
+ #   results_df = results_df.explode('codeRate')
     results_df = results_df.explode('is_duplicate')
-
+    
+    # convert the codeRate string into a float value
+    #results_df['codeRateFloat'] = results_df['codeRate'].str.replace(r'[\'\"]', '').apply(eval)
      
     # close the elastic connection
     clientES.transport.close()
@@ -140,8 +142,9 @@ def plot_SF_SNR_RSSI(results_df):
     g = sns.pairplot(
         data=results_df,
         diag_kind="kde",
+        corner=True,
     )
-    g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)     # no warining if we have no variance for one variable
+    g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)     # no warning if we have no variance for one variable
     
   
 
