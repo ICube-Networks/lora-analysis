@@ -75,16 +75,39 @@ def  es_query_packets():
             "rxInfo.rssi",
             "rxInfo.loRaSNR",
             "rxInfo.crcStatus",
-            "txInfo.spreadingFactor",
-            "txInfo.codeRate",
+            "txInfo.loRaModulationInfo.spreadingFactor",
+            "txInfo.loRaModulationInfo.codeRate",
             "dup_infos.is_duplicate",
         ]
     )
-    print(resp["hits"]['hits'][0])
     
+    
+      
     #extract the results
     results_df = pd.json_normalize(resp["hits"]['hits'])
   
+    # delete useless columns
+    results_df = results_df.drop(['_score', '_index'], axis=1)
+  
+    #rename the fields
+    results_df = results_df.rename(columns={
+        "fields.rxInfo.rssi": "rssi",
+        "fields.rxInfo.loRaSNR": "loRaSNR",
+        "fields.rxInfo.crcStatus": "crcStatus",
+        "fields.txInfo.loRaModulationInfo.spreadingFactor": "spreadingFactor",
+        "fields.txInfo.loRaModulationInfo.codeRate": "codeRate",
+        "fields.dup_infos.is_duplicate": "is_duplicate",
+    }, errors="raise")
+
+    #flatten the values (by default, each value is an array with one element
+    results_df = results_df.explode('rssi')
+    results_df = results_df.explode('loRaSNR')
+    results_df = results_df.explode('crcStatus')
+    results_df = results_df.explode('spreadingFactor')
+    results_df = results_df.explode('codeRate')
+    results_df = results_df.explode('is_duplicate')
+
+     
     # close the elastic connection
     clientES.transport.close()
 
@@ -108,8 +131,7 @@ def plot_SF_SNR_RSSI(results_df):
     :param pandas dataFrame containing the information
     """
 
-    print(results_df)
-
+ 
     # Create a seaborn visualization
     sns.set()
     sns.set_theme(style='whitegrid')
@@ -119,13 +141,9 @@ def plot_SF_SNR_RSSI(results_df):
         data=results_df,
         diag_kind="kde",
     )
-
-    # common
-    #axes = g.axes.flat[0]
-    #g.set(xlabel='Date', ylabel='Number of packets per day')
-    #g.set(ylim=(0, None))
-
- 
+    g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)     # no warining if we have no variance for one variable
+    
+  
 
     # save the figure
     fig = g.figure.savefig("figures/SF_RSSI_SNR.pdf")
@@ -133,11 +151,7 @@ def plot_SF_SNR_RSSI(results_df):
 
  
 
-
-
-
-
-    
+ 
  
 
     

@@ -21,6 +21,7 @@ import myconfig
 
 # json
 import json
+import flask 
 
 # numerical libraries
 import pandas as pd
@@ -473,4 +474,6 @@ def int_to_longdayofweek(day):
     if (day <0 or day>7):
         raise Exception('Unknown week of day')
     return(dayofweek.long[i])
+     
+     
      
