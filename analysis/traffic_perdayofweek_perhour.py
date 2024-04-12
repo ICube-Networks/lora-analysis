@@ -82,23 +82,23 @@ def es_query_traffic_per_dayofweek(clientES):
                 "script": {
                 "source":"emit(doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString());" }
             }
-    },
-    aggs={
-        "day_of_week": {
-            "terms": {
-                "field": "day_of_week",
-                "size": 7
-            },
-            "aggs":{
-                "date-day": {
-                    "terms": {
-                        "field": "date-day",
-                        "size": SIZE_RESP_ELASTIC
+        },
+        aggs={
+            "day_of_week": {
+                "terms": {
+                    "field": "day_of_week",
+                    "size": 7
+                },
+                "aggs":{
+                    "date-day": {
+                        "terms": {
+                            "field": "date-day",
+                            "size": SIZE_RESP_ELASTIC
+                        }
                     }
                 }
             }
-        }
-    },
+        },
     )
     #print(resp)
     

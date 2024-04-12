@@ -48,7 +48,7 @@ logging.basicConfig(stream=sys.stdout)
 
 
 
-NUMPACKETS_MAX = 50000
+NUMPACKETS_MAX = 10
 
 
 def  es_query_packets():
@@ -81,7 +81,7 @@ def  es_query_packets():
             request_timeout=300,
             query=tools.queries.QUERY_DATA,
             source=False,
-             fields=[
+            fields=[
                 "rxInfo.rssi",
                 "rxInfo.loRaSNR",
                 "rxInfo.crcStatus",
@@ -89,21 +89,28 @@ def  es_query_packets():
                 "txInfo.loRaModulationInfo.spreadingFactor",
                 "dup_infos.is_duplicate",
                 "mqtt_time",
+                "random",
             ],
+            runtime_mappings={
+                "random": {
+                    "type": "keyword",
+                    "script": { "source": "String str = doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString()+doc['mqtt_time'].value.getHour().toString()+doc['mqtt_time'].value.getMinute().toString()+doc['mqtt_time'].value.getSecond().toString()+doc['phyPayload.keyword'].value; emit(Integer.toString(str.hashCode()));"
+                    }
+                },
+            },
             pit={
                 "id": pit_id,
                 "keep_alive": "1m",
             },
-
-            search_after=[
-                    datemin,
-                    0
-            ],
-            sort=[
-                {"mqtt_time": {"order": "asc"}},
-                {"_score": {"order": "desc"}},
-            ],
-            )
+            #search_after=[
+            #        random_min,
+            #        0
+            #],
+            #sort=[
+            #    {"random": {"order": "asc"}},
+            #    {"_score": {"order": "desc"}},
+            #],
+        )
           
         #extract the results
         df_tempo = pd.json_normalize(resp['hits']['hits'])
@@ -129,18 +136,9 @@ def  es_query_packets():
         df_tempo = df_tempo.explode('spreadingFactor')
         df_tempo = df_tempo.explode('is_duplicate')
         
-        # convert the codeRate string into a float value
-        #df_tempo['codeRateFloat'] = df_tempo['codeRate'].str.replace(r'[\'\"]', '').apply(eval)
-     
-        #stops if we have less than QUERY_SIZE elements, it was the last response
-        length= len(resp['hits']['hits'])
-        #extracts the mqtt-time of the last element to then scroll later
-        datemin = resp['hits']['hits'][length-1]['fields']['mqtt_time'][0]
-
-        counter_numpackets += tools.queries.QUERY_NB_RESULT
-        if (length < tools.queries.QUERY_NB_RESULT) or (counter_numpackets > NUMPACKETS_MAX):
-            break
-            
+        # cut useless columns
+        
+             
         #append the new dataframe to the previous one (or copy if it doesn't yet exist)
         if 'results_df' in locals():
             results_df = pd.concat([results_df, df_tempo])
@@ -149,6 +147,14 @@ def  es_query_packets():
         else:
             results_df = df_tempo
             print("create")
+     
+     
+        #stop the iteration now, we have enough results
+        counter_numpackets += tools.queries.QUERY_NB_RESULT
+        if (len(resp['hits']['hits']) < tools.queries.QUERY_NB_RESULT) or (counter_numpackets > NUMPACKETS_MAX):
+            break
+
+     
      
     # close the elastic connection
     clientES.transport.close()
