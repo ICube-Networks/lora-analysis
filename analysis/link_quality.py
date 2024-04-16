@@ -48,7 +48,7 @@ logging.basicConfig(stream=sys.stdout)
 
 
 
-NUMPACKETS_MAX = 10
+NUMPACKETS_MAX = 50000
 
 
 def  es_query_packets():
@@ -73,9 +73,7 @@ def  es_query_packets():
     datemin = "0"           # we start with the date 0
     counter_numpackets = 0  # we count the numnber of packets we considered
     while True:
-        resp = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password),
-        ).search(
+        resp = clientES.search(
             #index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
             request_timeout=300,
@@ -89,15 +87,7 @@ def  es_query_packets():
                 "txInfo.loRaModulationInfo.spreadingFactor",
                 "dup_infos.is_duplicate",
                 "mqtt_time",
-                "random",
             ],
-            runtime_mappings={
-                "random": {
-                    "type": "keyword",
-                    "script": { "source": "String str = doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString()+doc['mqtt_time'].value.getHour().toString()+doc['mqtt_time'].value.getMinute().toString()+doc['mqtt_time'].value.getSecond().toString()+doc['phyPayload.keyword'].value; emit(Integer.toString(str.hashCode()));"
-                    }
-                },
-            },
             pit={
                 "id": pit_id,
                 "keep_alive": "1m",
@@ -106,17 +96,20 @@ def  es_query_packets():
             #        random_min,
             #        0
             #],
-            #sort=[
-            #    {"random": {"order": "asc"}},
-            #    {"_score": {"order": "desc"}},
-            #],
+            sort=[{
+                "_script": {
+                    "type": "number",
+                    "script": "Random r = new Random(); double value; value = r.nextDouble(); return(value);",
+                    "order": "desc",
+                },
+            }],
         )
-          
+            
         #extract the results
         df_tempo = pd.json_normalize(resp['hits']['hits'])
       
         # delete useless columns
-        df_tempo = df_tempo.drop(['_score', '_index'], axis=1)
+        df_tempo = df_tempo.drop(['_score', '_index', 'sort'], axis=1)
       
         #rename the fields
         df_tempo = df_tempo.rename(columns={
@@ -128,30 +121,26 @@ def  es_query_packets():
             "fields.dup_infos.is_duplicate": "is_duplicate",
         }, errors="raise")
 
-        #flatten the values (by default, each value is an array with one element
+        # flatten the values (by default, each value is an array with one element
         df_tempo = df_tempo.explode('rssi')
         df_tempo = df_tempo.explode('loRaSNR')
         df_tempo = df_tempo.explode('crcStatus')
         df_tempo = df_tempo.explode('channel')
         df_tempo = df_tempo.explode('spreadingFactor')
         df_tempo = df_tempo.explode('is_duplicate')
-        
-        # cut useless columns
-        
-             
-        #append the new dataframe to the previous one (or copy if it doesn't yet exist)
+                        
+        # Transform boolean fields
+        #df_tempo['is_duplicate']  = df_tempo['is_duplicate'].fillna(True)
+  
+        # append the new dataframe to the previous one (or copy if it doesn't yet exist)
         if 'results_df' in locals():
-            results_df = pd.concat([results_df, df_tempo])
-            print("concat")
-            
+            results_df = pd.concat([results_df, df_tempo], ignore_index=True)
         else:
-            results_df = df_tempo
-            print("create")
-     
+             results_df = df_tempo
      
         #stop the iteration now, we have enough results
         counter_numpackets += tools.queries.QUERY_NB_RESULT
-        if (len(resp['hits']['hits']) < tools.queries.QUERY_NB_RESULT) or (counter_numpackets > NUMPACKETS_MAX):
+        if (len(resp['hits']['hits']) < tools.queries.QUERY_NB_RESULT) or (counter_numpackets >= NUMPACKETS_MAX):
             break
 
      
@@ -195,7 +184,7 @@ def plot_SF_SNR_RSSI(results_df):
   
 
     # save the figure
-    fig = g.figure.savefig("figures/SF_RSSI_SNR.pdf")
+    fig = g.figure.savefig("figures/qual_pairplots.pdf")
     g.figure.clf()
 
  
