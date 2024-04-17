@@ -244,10 +244,8 @@ class queries:
             "bool": {
               "must": [
                     {
-                        "term": {
-                            "extra_infos.phyPayload.mhdr.mType": "2"
-                        }
-                     }
+                    "term": {"extra_infos.phyPayload.mhdr.mType": "2"}
+                    }
                 ]
             }
         }
@@ -335,7 +333,7 @@ def elasticsearch_open_connection():
         "https://localhost:9200",
         ssl_assert_fingerprint=(myconfig.cert_fingerprint), #certificate of the server (its fingerprint)
         basic_auth=(myconfig.user, myconfig.password),      #credentials
-        request_timeout=10000,                              #10s for the requests
+        request_timeout=3000,                              #10s for the requests
     )
     logger_tool.debug(clientES.info())
     

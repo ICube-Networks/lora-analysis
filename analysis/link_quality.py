@@ -64,19 +64,16 @@ def  es_query_packets():
 
     clientES = tools.elasticsearch_open_connection()
     
-    
-    #PIT creation
-    pit_id = tools.elasticsearch_create_pit(clientES)
-    logger_quality.debug("PIT id: " + str(pit_id))
-
     #get the number of valid records per SF per channel
-    datemin = "0"           # we start with the date 0
-    counter_numpackets = 0  # we count the numnber of packets we considered
+    minkey = 0               # we start with the value 0
+    counter_numpackets = 0   # we count the numnber of packets we already processed
     while True:
+        logger_quality.info("Min key for the next ES query: " + str(minkey))
+
         resp = clientES.options(
             basic_auth=(myconfig.user, myconfig.password),
         ).search(
-            #index=myconfig.index_name,
+            index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
             query=tools.queries.QUERY_DATA,
             source=False,
@@ -87,20 +84,25 @@ def  es_query_packets():
                 "rxInfo.channel",
                 "txInfo.loRaModulationInfo.spreadingFactor",
                 "dup_infos.is_duplicate",
-                "mqtt_time",
+                "mqtt_time"
             ],
-            pit={
-                "id": pit_id,
-                "keep_alive": "1m",
-            },
+            search_after=[
+                minkey
+            ],
             sort=[{
                 "_script": {
                     "type": "number",
-                    "script": "Random r = new Random(); double value; value = r.nextDouble(); return(value);",
-                    "order": "desc",
+                    #index with a random double value
+                    #"script": "Random r = new Random(); double value; value = r.nextDouble(); return(value);",
+                    #index with a hash of the PHY + mqtt_time (to have the same key each time)
+                    "script": "return(Math.abs(doc['phyPayload.keyword'].hashCode() + doc['mqtt_time'].hashCode()));",
+                    "order": "asc",
                 },
             }],
         )
+        length = len(resp['hits']['hits'])
+        logger_quality.info("Num records read: " + str(length))
+        minkey = resp['hits']['hits'][length-1]['sort'][0]
             
         #extract the results
         df_tempo = pd.json_normalize(resp['hits']['hits'])
