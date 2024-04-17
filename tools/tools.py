@@ -333,10 +333,9 @@ def elasticsearch_open_connection():
     DEBUG_ES = False
     clientES = Elasticsearch(
         "https://localhost:9200",
-        verify_certs=False,
-        ssl_show_warn=False,
-        basic_auth=(myconfig.user, myconfig.password),
-        request_timeout=10000           #10s for the requests
+        ssl_assert_fingerprint=(myconfig.cert_fingerprint), #certificate of the server (its fingerprint)
+        basic_auth=(myconfig.user, myconfig.password),      #credentials
+        request_timeout=10000,                              #10s for the requests
     )
     logger_tool.debug(clientES.info())
     

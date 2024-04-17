@@ -65,12 +65,19 @@ do
 done
 #ES_ADMIN_PASS=`echo "${ES_ADMIN_PASS//[$'\t\r\n ']}"`
 
+#certificate of the server
+ES_CERT_FINGER=`echo "" |  openssl s_client -connect localhost:9200 |& openssl x509 -fingerprint -noout -sha256 | cut -d '=' -f 2 | sed 's/://g'  | tr '[:upper:]' '[:lower:]'`
+
+
+# store the variables in the CONFIG_FILE
 printf "done\n"
 echo "--> USER=elastic"
 echo "--> PASSWORD=$ES_ADMIN_PASS"
 echo "user=\"elastic\"" >> $CONFIG_FILE
-echo "password=\"${ES_ADMIN_PASS//[$'\t\r\n ']}\"" >> $CONFIG_FILE
+echo "password=\"${ES_ADMIN_PASS//[$'\t\r\n ']}\"" >> $CONFIG_FILE  #remove the EOL, etc.
 echo "index_name=\"lora-index\"" >> $CONFIG_FILE
+echo "cert_fingerprint=\"${ES_CERT_FINGER//[$'\t\r\n ']}\"" >> $CONFIG_FILE
+
 #Enrollment key for elastic search
 ES_ENROL_KEY=""
 while [ -z "${ES_ENROL_KEY}" ]

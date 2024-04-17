@@ -63,20 +63,21 @@ def  es_query_packets():
     """
 
     clientES = tools.elasticsearch_open_connection()
-
+    
+    
     #PIT creation
     pit_id = tools.elasticsearch_create_pit(clientES)
-    print("PID id: ", pit_id)
-
+    logger_quality.debug("PIT id: " + str(pit_id))
 
     #get the number of valid records per SF per channel
     datemin = "0"           # we start with the date 0
     counter_numpackets = 0  # we count the numnber of packets we considered
     while True:
-        resp = clientES.search(
+        resp = clientES.options(
+            basic_auth=(myconfig.user, myconfig.password),
+        ).search(
             #index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
-            request_timeout=300,
             query=tools.queries.QUERY_DATA,
             source=False,
             fields=[
@@ -92,10 +93,6 @@ def  es_query_packets():
                 "id": pit_id,
                 "keep_alive": "1m",
             },
-            #search_after=[
-            #        random_min,
-            #        0
-            #],
             sort=[{
                 "_script": {
                     "type": "number",

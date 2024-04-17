@@ -78,7 +78,6 @@ def  es_query_SF(clientES):
     ).search(
         index=myconfig.index_name,
         size=0,
-        request_timeout=300,
         query=tools.queries.QUERY_ALL_NODUP,
         aggs={
             "SF": {

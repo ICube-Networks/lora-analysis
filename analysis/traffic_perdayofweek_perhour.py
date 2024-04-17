@@ -68,7 +68,6 @@ def es_query_traffic_per_dayofweek(clientES):
     ).search(
         index=myconfig.index_name,
         size=0,
-        request_timeout=300,
         pretty=True,
         human=True,
         query=tools.queries.QUERY_ALL_NODUP,
@@ -165,7 +164,6 @@ def es_query_traffic_per_hour(clientES):
     ).search(
         index=myconfig.index_name,
         size=0,
-        request_timeout=300,
         pretty=True,
         human=True,
         query=tools.queries.QUERY_ALL_NODUP,

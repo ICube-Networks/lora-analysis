@@ -82,7 +82,6 @@ def es_query_session_duration(operator, field_scope, field_value):
     ).search(
         index=myconfig.index_name,
         size=0,
-        request_timeout=3000,
         pretty=True,
         human=True,
         query=tools.queries.QUERY_DATA_NODUP,
