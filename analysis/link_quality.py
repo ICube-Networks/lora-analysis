@@ -47,8 +47,8 @@ logger_quality.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 
-
-NUMPACKETS_MAX = 50000
+#variables
+NUMPACKETS_MAX = 10000
 
 
 def  es_query_packets():
