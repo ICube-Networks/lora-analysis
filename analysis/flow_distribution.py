@@ -1,7 +1,8 @@
-""" devEUI & devAddr distribution analysis .
+""" inter packet time distribution analysis .
 
-This scripts extracts from an elasticsearch instance statistics concerning
-the devEUI/devAddr distribution
+This scripts reads the distribution stored on the disk and
+analyzes them (i.e., plot some graphs)
+
 
 """
 
@@ -18,9 +19,8 @@ __version__= "1.0"
 import sys
 sys.path.insert(1, '../config')
 sys.path.insert(1, '../tools')
+sys.path.insert(1, '../preproc')
 
-# elastic search for the queries
-from elasticsearch import Elasticsearch
 
 # configuration parameters
 import myconfig
@@ -32,14 +32,20 @@ import tools
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import math
+import scipy.stats
 
 # format
-import requests, json, os, tarfile, pathlib
-import matplotlib.dates as mdates
+from datetime import datetime, timedelta
 
-# Import seaborn
+# Data science and co
 import seaborn as sns
+import pandas as pd
    
+#sys
+import sys, getopt
+import random
+
 #logs
 import logging
 logger_flow = logging.getLogger('flow_distribution')
@@ -47,273 +53,231 @@ logger_flow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 
+    
+# read distributions from the disk
+import extract_interpacket_distribution
 
 
-def es_query_count_for_field(params):
-    """ Elastic search query for a double aggregate query.
+
+#parameters
+NB_PKTS_MIN = 25        # minimum number of packets for a given devAddr (else discarded) to compute the median value
+NB_PLOTS = 25           # number of plots for individual distributions
+INTERPKTIME_MAX = 10**4 # maxium interpacket time considered when plotting the correlation nbpkts / inter packet time
+
+
+# --------------------------------------------------------
+#       PLOTS
+# --------------------------------------------------------
+
+
+
+def plot_interpkt_time_distribution_grid(pd_frame, plot_list, count, nb_cols):
+    """ Plot a list of distributions (timeseries) from a pandas dataframe with an ECDF
+        
+    :param distribution: a pandas dataframe containing a distribution (pandas series) for each row
     
-    This function sends a query to an elastic search server to retrive the doc counts for two field values (fieldname1 and fieldname2), and returns the corresponding pandas DataFrame
-    
-    
-    :param dictionary params: a list of two field names (with the keys fieldname1 and fieldname2) to construct the elastic search query
-    
-    :returns: a pandas DataFrame which contains the count numbers for each fields in the params variable (hierarchical aggregate)
-    :rtype: DataFrame
     """
-
-    clientES = tools.elasticsearch_open_connection()
-
-    #get the number of valid records per day of the week
-    resp = clientES.options(
-        basic_auth=(myconfig.user, myconfig.password)
-    ).search(
-        index=myconfig.index_name,
-        size=0,
-        pretty=True,
-        human=True,
-        query=tools.queries.QUERY_EXTRAINFO_EXIST_NODUP, 
-        aggs={
-            params['fieldname1']: {
-                "terms": {
-                    "field": params['fieldname1'],
-                    "size": 1000,
-                },
-                "aggs": {
-                    params['fieldname2']: {
-                        "terms": {
-                            "field": params['fieldname2'],
-                            "size": 1000,
-                        }
-                    }
-                }
-            }
-        }
-    )
-    #print(resp)
-    
-    # transform the aggregation results into a pandas' dataframe
-    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(params['fieldname1'],params['fieldname2']), key_as_string=False)
-    
-    # close the elastic connection
-    clientES.transport.close()
-    
-    if results_df.empty:
-        logger_flow.critical("Empty pandaframe")
-        exit(2)
-    
-    #result
-    return(results_df)
- 
-    
- 
-
-    
-# trafic per day of week
-def plot_pkt_per_flow():
-    """Plot the graph for the flow distribution.
-    
-    Generates two seaborn plots:
-    
-    # distribtuion of the number of packets per devAddr per fow per LoRa gateway
-    # distribtuion of the number of packets per devEUI per fow per LoRa gateway
-
-    :param Elasticsearch clientES: an active connection to an elastic search server
-
-    """
-
-    params_list = []
-    
-    #parameters of the query for devAddr
-    params_list.append({
-        'fieldname1' : 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
-        'fieldname2' : 'rxInfo.gatewayID.keyword',
-        'xlabel' : 'Number of packets per devAddr',
-        'figname' : 'figures/flow_distrib_pkts_per_devAddr.pdf'
-        })
-    #parameters of the query for devEUI
-    params_list.append({
-        'fieldname1' : 'extra_infos.phyPayload.macPayload.devEUI.keyword',
-        'fieldname2' : 'rxInfo.gatewayID.keyword',
-        'xlabel' : 'Number of packets per devEUI',
-        'figname' : 'figures/flow_distrib_pkts_per_devEUI.pdf'
-        })
-
-
-    for params in params_list:
-        #es query
-        results_df = es_query_count_for_field(params=params)
-        print(results_df)
-        
-        
-        str = params['fieldname2']
-        print(str)
-        
-        # Create a seaborn visualization
-        sns.set()
-        sns.set_theme()
-        g = sns.ecdfplot(
-            data=results_df,
-            x="count",
-            hue=str,
-            palette="tab10",   #only if hue specified
-        )
-        #g.set_xlim(0, 1000)
-        #g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        g.set(xlabel=params['xlabel'],)
-        #plt.legend(bbox_to_anchor=(1, 1), loc=2)
-        
-        #fsave and flush
-        fig = g.figure.savefig(params['figname'])
-        g.figure.clf()
-
-
-
-def es_query_flow_duration(operator, field_scope, field_value):
-    """Elastic search query for a double aggregate query.
-    
-    This function sends a query to an elastic search server to retrieve the doc counts
-    for two field values (fieldname1 and fieldname2), and returns the corresponding
-    pandas DataFrame
-    
-    :param string operator: the aggregation operator (max or min) for the query which will be used on the field "field_value".
-    
-    :param dictionary field_scope: name of the elastic field to define classes (e.g., extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword to group the packets per devAddr)
-    
-    :param dictionary field_value: name of the field where the operator is applied (e.g. mqtt_time to get the max or min time for a given class)
-    
-    :returns: a pandas DataFrame which contains the duration of all
-    :rtype: DataFrame
-    """
-
-    
-    # open the connection to the elastic search server
-    clientES = tools.elasticsearch_open_connection()
-
-    #PIT creation
-  #  pit_id = tools.elasticsearch_create_pit(clientES)
-  #  logger_flow.debug("PIT id: " + str(pit_id))
-
-    min_next = ""
-    while True:
-        
-        logger_flow.info("Min key for the next ES query: " + min_next)
-
-        #get the number of valid records per day of the week
-        resp = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password)
-        ).search(
-            index=myconfig.index_name,
-            size=0,
-            pretty=True,
-            human=True,
-            query=tools.queries.QUERY_DATA_NODUP,
-            aggs={
-                field_scope: {
-                    "composite": {
-                    "size" : tools.queries.QUERY_NB_RESULT,
-                    "sources": [{
-                        field_scope: {
-                            "terms": {"field": field_scope}
-                        }
-                    }],
-                    "after": { field_scope: min_next }
-                  },
-                  "aggs":{
-                    operator+field_value: {operator: {"field": field_value}},
-                    "max"+field_value: {"max": {"field": field_value}}
-                  }
-                }
-              },
-              sort=[
-                {field_scope : "asc"},
-              ],
-              search_after=[
-                min_next
-              ],
-        )
-               
-        #next minimum value
-        min_next = resp['aggregations'][field_scope]['after_key'][field_scope]
-                  
-        # transform the aggregation results into a pandas' dataframe
-        results_df_tmp = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(field_scope, ), field_values=(operator+field_value, "max"+field_value), key_as_string=False)
- 
- 
-        # append the new dataframe to the previous one (or copy if it doesn't yet exist)
-        if 'results_df' in locals():
-            results_df = pd.concat([results_df, results_df_tmp], ignore_index=True)
-        else:
-            results_df = results_df_tmp
-
-
-        #print(resp['aggregations'][field_scope])
-        logger_flow.info("Num records read: " + str(len(resp['aggregations'][field_scope]['buckets'])))
-
-        if (len(resp['aggregations'][field_scope]['buckets']) < tools.queries.QUERY_NB_RESULT):
-            break
-                
-    clientES.transport.close()
-
-    
-    
-    if results_df.empty:
-        logger_flow.critical("Empty pandaframe")
-        exit(2)
-    
-    #result
-    return(results_df)
- 
-    
-# distribution of the flow durations
-def plot_flow_duration():
-    """ Plot the distribution of durations.
-    
-    This function uses a pandas dataFrame to plot the distributions.
-        
-    """
-    
-    
-    #es query
-    results_df = es_query_flow_duration(operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
-    #results_df["minmqtt_timeas_string"] = mdates.date2num(results_df["minmqtt_timeas_string"])
-    results_df["flow_duration"] = mdates.date2num(results_df["maxmqtt_timeas_string"]) - mdates.date2num(results_df["minmqtt_timeas_string"])
-    logger_flow.info(results_df)
-  
-    # Create a seaborn visualization
     sns.set()
     sns.set_theme()
-    g = sns.ecdfplot(
-        data=results_df,
-        x="flow_duration",
-    #    hue=str,
-    #    palette="tab10",   #only if hue specified
-    )
-    axes = g.axes
-    g.set(xlabel='Duration of the flow (in days)',)
+    sns.set(font_scale=1/math.pow(len(plot_list), 1/3))
+
+    #a grid of plots
+    fig, axs = plt.subplots(ncols=nb_cols, nrows=math.ceil(count/nb_cols))
+        
+    #live view of the distributions for each packet
+    for g_id in range(0, len(plot_list)-1):
     
-    # formating dates -> not required since this is not a date but a difference (=duration)
-    #locator = mdates.AutoDateLocator()
-    #formatter = mdates.ConciseDateFormatter(locator)
-    #axes.xaxis.set_major_locator(locator)
-    #axes.xaxis.set_major_formatter(formatter)
-    
-    fig = g.figure.savefig('figures/flow_distrib_durations.pdf')
+        col = g_id % nb_cols
+        row = math.floor(g_id / nb_cols)
+        
+        #print("g_id=" + str(g_id) + ' plot=' + str(plot_list[g_id]))
+ 
+        #not enough packets -> nothing to plot
+        if pd_frame.iloc[plot_list[g_id]]['nb_pkts'] < NB_PKTS_MIN:
+            logger_flow.error("Not enough packets for the devAddr " + pd_frame.iloc[plot_list[g_id]]['devAddr'] + " -> should not happen (these @ should be filtered first)")
+            continue
+        
+         
+        # several rows in the plots
+        pd_distrib = extract_interpacket_distribution.load_distrib_from_disk(pd_frame.iloc[plot_list[g_id]]['devAddr'])
+         
+        #convert into minues
+        pd_distrib['interpkt_time'] = pd_distrib['interpkt_time']/3600
+        
+
+        if (count > nb_cols):
+            g = sns.ecdfplot(
+                pd_distrib['interpkt_time'].array,
+                ax=axs[row, col]
+            )
+        #one single row
+        elif count > 1:
+            g = sns.ecdfplot(
+                pd_distrib['interpkt_time'].array,
+                ax=axs[col]
+            )
+        #one single plot
+        else:
+             g = sns.ecdfplot(
+                pd_distrib['interpkt_time'].array
+            )
+
+        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time'].size)+" pkts/@="+pd_frame.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
+        g.set(xlim=(0, np.max(pd_distrib['interpkt_time'].array)))
+        
+        #debug
+        logger_flow.info("g_id=" + str(plot_list[g_id]) + ", devAddr=" + pd_frame.iloc[plot_list[g_id]]['devAddr'] + ", max=" + str(np.max(pd_distrib['interpkt_time'].array)))
+        
+    plt.tight_layout(pad=0.8, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/flow_interpkt_time_distribution_collection.pdf")
     g.figure.clf()
 
+    
+    
+
+def plot_interpkt_time_distribution_unique(pd_frame):
+    """ Plot a distribution (pd dataframe) with an ECDF
+        
+    :param distribution: a pandas dataframe with the data to plot
+    
+    """
+    sns.set()
+    sns.set_theme()
+    sns.set(font_scale=1)
+      
+    g = sns.ecdfplot(
+        pd_frame,
+        log_scale=True
+    )
+    g.set(xlabel='Inter pkt time', ylabel='Proportion')
+    
+    # remove values under 1s from the x-coordinates
+    g.set(xlim=(1, pd_frame.max()))
+    
+    #label with the typical units of time
+    values = [1, 60, 3600, 86400, 604800, 2419200]
+    labels = ["1s", "1min", "1h", "1d", "1w", "1m" ]
+    g.set_xticks(values, labels=labels)
+    
+    
+    #save figure
+    plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/interpkt_time_distribution_median.pdf")
+    g.figure.clf()
+         
+     
+     
+def plot_interpkt_nbpkts(pd_frame):
+    """ Plot the interpacket time vs. the number of packets of the flow
+    to see the correlation
+        
+    :param distribution: a pandas dataframe with the data to plot
+    
+    """
+    
+    sns.set()
+    sns.set_theme(style='whitegrid')
+    sns.set(font_scale=1)
+
+
+    #g = sns.scatterplot(
+    #    x="median_interpkt_time",
+    #    y="nb_pkts",
+    #    data=pd_frame
+    #    )
+    g = sns.pairplot(
+        pd_frame,
+        diag_kind="kde",
+    #   corner=True,
+    #    diag_kind="hist",
+    )
+    g.map_lower(sns.kdeplot, levels=4, color=".2")
+    
+    #save figure
+    g.figure.savefig("figures/flow_interpkttime_nbpkts_correlation.pdf")
+    g.figure.clf()
+  
+    r,p = scipy.stats.pearsonr(pd_frame["median_interpkt_time"], pd_frame["nb_pkts"])
+    logger_flow.info('correlation coefficient =' + str(r))
+    logger_flow.info('p-value = ' + str(p))
+    
 
 
 
 
 
+
+# --------------------------------------------------------
+#       MAIN
+# --------------------------------------------------------
+
+def help():
+    print ("Usage: "+ sys.argv[0] +' -n <nb_plots>')
+
+
+def main(argv):
+    """Extracts the arguments
+    
+    """
+    global NB_PLOTS
+        
+
+    try:
+        opts, args = getopt.getopt(argv,"hn::",["nb_plots="])
+    except getopt.GetoptError:
+        print("Error in the arguments")
+        help()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+           help()
+           sys.exit(0)
+        elif opt in ("-n", "--nb_plots"):
+           NB_PLOTS = int(arg)
+
+
+    logger_flow.info('Will generate the individual distribution plots for ' + str(NB_PLOTS) + ' devAddrs')
+
+   
+   
+   
+    
 # executable
 if __name__ == "__main__":
-    """Executes the script to plot the distributions of flows (duration, number of pkts per devAddr and devEUI)
+    """Executes the script to analyze the distribution of inter packet times
  
     """
     
-    # duration of each flow
-    plot_flow_duration()
-    
-    #plot the number of packets per devAddr / devEUI
-    plot_pkt_per_flow()
+    # ---- arguments -----
+    main(sys.argv[1:])
+       
+    # ---- disk -----
+    # load data that is on the disk (already read previously)
+    logger_flow.info("Reading distributions from the disk....")
+    pd_interpk = extract_interpacket_distribution.load_from_disk()
+    logger_flow.info("> done!")
 
+    #print(pd_interpk)
+    #print(pd_interpk.iloc[2]['distribution'].to_string())
+    #print(pd_interpk.iloc[2]['fCnt'].to_string())
+
+
+    # --- plots ---
+    # plot a grid of distributions (invidividual analysis)
+    nb_plots = min(NB_PLOTS, len(pd_interpk))
+    nb_cols = math.ceil(math.sqrt(nb_plots))
+    plot_list = random.choices(range(0,len(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)])-1), k=nb_plots)
+    plot_interpkt_time_distribution_grid(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)], plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
+
+
+    #info
+    logger_flow.info("Analysis: " + str(len(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time'])) + " / " +  str(len(pd_interpk)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
+
+    # plot the EDCF of the median inter packet time (remove samples with not enough packets)
+    plot_interpkt_time_distribution_unique(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN)]['median_interpkt_time'])
+
+    #correlation inter pkt time / nb packets
+    plot_interpkt_nbpkts(pd_interpk[(pd_interpk.nb_pkts >= NB_PKTS_MIN) & (pd_interpk.nb_pkts <= 4000 ) & (pd_interpk.median_interpkt_time <= INTERPKTIME_MAX)])
+
+    
+#0f9aa96f : distribution en escalier
