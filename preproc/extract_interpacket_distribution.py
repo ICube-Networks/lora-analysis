@@ -50,8 +50,8 @@ from datetime import datetime, timedelta
    
 #logs
 import logging
-logger_interpkt = logging.getLogger('interpkt_distribution')
-logger_interpkt.setLevel(logging.INFO)
+logger_preprocflow = logging.getLogger('interpkt_distribution')
+logger_preprocflow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # system
@@ -64,18 +64,21 @@ DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 
 AGG_OFFSET = 1000                   # offset for the pagination in the aggregatied query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
-QUERY_NB_RESULT = 10000                #  number of results for our elastic search queries
+QUERY_NB_RESULT = 10000             #  number of results for our elastic search queries
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
 FILENAME_DF = 'data/dataset.parquet'# the name of the file to read/write the data frames
 FILENAME_DISTRIB = 'data/distrib_'  # the prefix of the filenames for the distribution
 
+# conditions for a new flow
+DELTA_FCNT_MAX = 10                 # if the counter diff exceeds this value between two consecutive packets -> new flow
+DELTA_INTERPKT_TIME_MAX = 3         # if the inter-packet time exceeds DELTA_INTERPKT_TIME_MAX * max_value (in the existing timeseries)
       
 # --------------------------------------------------------
 #       ELASTIC SEARCH QUERIES
 # --------------------------------------------------------
 
 
-def es_query_get_devAddr(clientES):
+def es_query_get_devAddr():
     """ Elastic query to get the list of unique devAddrs
      
     :param clientES is an active connection to an elastic search server
@@ -85,6 +88,7 @@ def es_query_get_devAddr(clientES):
     :rtype: list of string
     """
 
+    clientES = tools.elasticsearch_open_connection()
 
     #Until we have still devAddr to get
     pagination_count = 0
@@ -105,19 +109,17 @@ def es_query_get_devAddr(clientES):
                         "size": DEVADDR_COUNT_MAX,
                     },
                     "aggs": {
-                    "bucket_sort": {
-                        "bucket_sort": {
-                            "sort": [{
-                                "_key": {
-                                    "order": "asc"
-                                }
-                            }],
-                            # "from" and "size" use above terms bucket size. It implements the pagination
-                            "from": pagination_count * AGG_OFFSET,
-                            "size": AGG_OFFSET
+                        "devAddr_bucket_sort": {
+                            "bucket_sort": {
+                                "sort": [
+                                    {"_key": {"order": "asc"}}
+                                ],
+                                # "from" and "size" use above terms bucket size. It implements the pagination
+                                "from": pagination_count * AGG_OFFSET,
+                                "size": AGG_OFFSET
+                            }
                         }
                     }
-                }
                 }
             }
         )
@@ -127,12 +129,12 @@ def es_query_get_devAddr(clientES):
         
         # no more record
         if (len(response["aggregations"]["devAddr"]["buckets"]) == 0):
-            logger_interpkt.info("Elastic search: last page for the aggregate query")
+            logger_preprocflow.info("Elastic search: last page for the aggregate query")
             break;
         
         
         # dump the json response for debug (VERY verbose !!)
-        logger_interpkt.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
+        logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
         
         # add the corresponding devAddr in the list
         for record in response["aggregations"]["devAddr"]["buckets"]:
@@ -140,14 +142,102 @@ def es_query_get_devAddr(clientES):
   
    
     # end of extraction
-    logger_interpkt.info("\t> Found " + str(len(list_devAddr)) + " different devAddrs")
+    logger_preprocflow.info("\t> Found " + str(len(list_devAddr)) + " different devAddrs")
    
     #result
     return(list_devAddr)
  
    
+def pd_create_record(devAddr, flow_id, pd_distrib):
 
-def eq_query_get_interpkt(clientES, devAddr):
+
+
+#    logger_preprocflow.debug(devAddr + " (list size) -> " + str(pd_distrib.size))
+
+ 
+
+    #save the raw distribution (dataframe in a file)
+    #save_distrib_to_disk(pd_distrib, devAddr, flow_id)
+
+
+    #s new record to add
+    if pd_distrib.size > 0:
+        record = {
+            'devAddr': [devAddr,],
+            'flow': flow_id,
+            'median_interpkt_time': pd_distrib['interpkt_time'].median(),
+            'max_time': pd_distrib['interpkt_time'].max(),
+            'min_time': pd_distrib['interpkt_time'].min(),
+            'nb_pkts': [pd_distrib.size + 1,],         # number of packets = length of the list + one
+        }
+    else:
+        record = {
+            'devAddr': [devAddr,],
+            'flow': flow_id,
+            'median_interpkt_time': [pd.NaT,],
+            'max_time': pd_distrib['interpkt_time'].max(),
+            'min_time': pd_distrib['interpkt_time'].min(),
+            'nb_pkts': [pd_distrib.size + 1,] ,        # number of packets = length of the list + one
+       }
+
+    return(record)
+
+
+
+def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
+    """ Elastic query to get the list of inter packet time for a given devAddr
+        
+    :param devAddr: the devADDR to ask for
+    
+    :param mqtt_time_min: the min mqqt_time in the query
+        
+    :returns: the elastic search response + the next mqtt_time_min to ask for
+    
+    :rtype: elastic search json response + string
+    """
+
+    clientES = tools.elasticsearch_open_connection()
+
+    response = clientES.search(
+        index=myconfig.index_name,
+        size=QUERY_NB_RESULT,
+        pretty=True,
+        human=True,
+        query={
+            "bool": {
+                "filter" : [
+                    {"match": {"dup_infos.is_duplicate": False}},
+                    {"match": {"extra_infos.phyPayload.mhdr.mType": "2"}},
+                    {"match": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
+                ],
+            }
+        },
+        fields=[
+            "mqtt_time",
+            "extra_infos.phyPayload.macPayload.fhdr.fCnt",
+            "_id",
+        ],
+        sort=[
+            {"mqtt_time" : "asc"}
+        ],
+        search_after=[mqtt_time_min],
+        source = False
+    )
+    
+    # dump the json response for debug (VERY verbose !!)
+    logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
+
+    # next page for the query
+    length = len(response["hits"]["hits"])
+    mqtt_time_min = response["hits"]["hits"][length-1]["fields"]["mqtt_time"][0]
+ 
+    return(response, mqtt_time_min)
+    
+    
+
+
+
+def eq_query_get_interpkt(devAddr):
     """ Elastic query to get the list of inter packet time for a given devAddr
         
     :param clientES is an active connection to an elastic search server
@@ -165,86 +255,105 @@ def eq_query_get_interpkt(clientES, devAddr):
     # -> without duplicates
     # -> ordered chronologically (by mqtt_time)
     mqtt_time_min = 0
+    flow_id = 0
+    test = 0
     while True:
     
-        response = clientES.search(
-            index=myconfig.index_name,
-            size=QUERY_NB_RESULT,
-            pretty=True,
-            human=True,
-            query={
-                "bool": {
-                    "filter" : [
-                        {"match": {"dup_infos.is_duplicate": False}},
-                        {"match": {"extra_infos.phyPayload.mhdr.mType": "2"}},
-                        {"match": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
-                    ],
-                }
-            },
-            fields=[
-                "mqtt_time",
-                "extra_infos.phyPayload.macPayload.fhdr.fCnt",
-            ],
-            sort=[
-                {"mqtt_time" : "asc"}
-            ],
-            search_after=[mqtt_time_min],
-            source = False
-        )
+        #tx the elastic search query to the server
+        response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
             
         #no remaining response
         length = len(response["hits"]["hits"])
         if (length == 0):
             break
 
-        # dump the json response for debug (VERY verbose !!)
-        logger_interpkt.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
-      
-        pd_distrib = pd.DataFrame({'interpkt_time': [], 'fCnt': []})
-        pd_distrib['fCnt'] = int
-      
+
+        #pointer to the last packet of the flow (initially, packet 0)
+        pointer_last_pkt_of_the_flow = 0
+
         # computes the inter packet time
-        for i in range(0, len(response["hits"]["hits"])  - 1):
-            diff = datetime.strptime(response["hits"]["hits"][i+1]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH) \
+        for i in range(1, len(response["hits"]["hits"])  - 1):
+            
+            #create the dataframe if it doesn't exist yet
+            if 'pd_distrib' not in locals():
+                print("dataframe creation")
+                pd_distrib = pd.DataFrame({'interpkt_time': [], 'fCnt': []})
+                pd_distrib['fCnt'] = int
+                test = test + 1
+
+
+            diff = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH) \
                 - \
-                datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
+                datetime.strptime(response["hits"]["hits"][pointer_last_pkt_of_the_flow]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
+            
+            #frame counter difference
+            fCnt_diff = response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0] - response["hits"]["hits"][pointer_last_pkt_of_the_flow]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0]
+            
+            
+            print("fCnt diff: " + str(fCnt_diff) + ' time ' + str(diff.total_seconds()) + " _id " +
+                        str(response["hits"]["hits"][i]["fields"]["_id"][0]),
+                        str(response["hits"]["hits"][pointer_last_pkt_of_the_flow]["fields"]["_id"][0])
+                        )
 
-
-            pd_record_distrib = {
-                'interpkt_time': diff.total_seconds(),
-                'fCnt': response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0]
-            }
-            pd_distrib = pd.concat([pd_distrib, pd.DataFrame(data=pd_record_distrib, index=[0])], ignore_index=True)
+            # same flow ?
+            if (fCnt_diff < DELTA_FCNT_MAX):
+                if (i-1 != pointer_last_pkt_of_the_flow):
+                    print("ecrase le gap")
+                    
+                #create a record for this correct packet
+                pd_record_distrib = {
+                    'interpkt_time': diff.total_seconds(),
+                    'fCnt': fCnt_diff,
+                }
+                # my reference is this new packet
+                pointer_last_pkt_of_the_flow = i
+                
+                #and insert the new record
+                pd_distrib = pd.concat([pd_distrib, pd.DataFrame(data=pd_record_distrib, index=[0])], ignore_index=True)
+            
  
+            # flush if it corresponds to a new flow
+            # counter diff > threshold value
+            # inter packet time > max inter packet time * X
+            if (fCnt_diff > DELTA_FCNT_MAX) and (diff.total_seconds() > DELTA_INTERPKT_TIME_MAX * (pd_distrib['interpkt_time'].max())) :
+                print("stop the previous flow, finished time diff " + str(diff.total_seconds()) + " > " + str(pd_distrib['interpkt_time'].max()) + ' fnct diff ' + str(fCnt_diff))
+                
+                
+                record = pd_create_record(devAddr=devAddr, flow_id=flow_id, pd_distrib=pd_distrib)
+                if 'pd_these_flows' not in locals():
+                    pd_these_flows = pd.DataFrame(data=record)
+                else:
+                    pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record)], ignore_index=True)
+                
+                flow_id = flow_id + 1       # next flow
+                del pd_distrib              # remove the occurence to the dataframe
+               
+                #back to the pointer where it diverged
+                i = pointer_last_pkt_of_the_flow + 1
+               
+                PROBLEM: continue ensuite à boucler alors qu'il devrait considéerer qu'ils s'agit d'un nouveau flot (la diff de compteur devrait rebaisser, alors qu'elle continue à s'accumuler)
+               
+ 
+            if test > 9:
+                exit(4)
+            
+    
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < QUERY_NB_RESULT):
             break
-            
-        # next page for the query
-        mqtt_time_min = response["hits"]["hits"][length-1]["fields"]["mqtt_time"][0]
-       
-    logger_interpkt.debug(devAddr + " (list size) -> " + str(pd_distrib.size))
+   
+   
+   
+    #flush if still one pending record
+    if (len(pd_distrib) > 0):
+        record = pd_create_record(devAddr=devAddr, flow_id=flow_id, pd_distrib=pd_distrib)
+        if 'pd_these_flows' not in locals():
+            pd_these_flows = pd.DataFrame(data=record)
+        else:
+            pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record)], ignore_index=True)
 
-    #save the raw distribution (dataframe in a file)
-    save_distrib_to_disk(pd_distrib, devAddr)
-
-
-    #saves the results in a dataframe
-    if pd_distrib.size > 0:
-        record = {
-            'devAddr': [devAddr,],
-            'median_interpkt_time': pd_distrib['interpkt_time'].median(),
-            'nb_pkts': [pd_distrib.size + 1,],         # number of packets = length of the list + one
-        }
-    else:
-        record = {
-            'devAddr': [devAddr,],
-            'median_interpkt_time': [pd.NaT,],
-            'nb_pkts': [pd_distrib.size + 1,] ,        # number of packets = length of the list + one
-       }
     
-    
-    return(pd.DataFrame(data=record))
+    return(pd_these_flows)
 
 
        
@@ -260,36 +369,36 @@ def eq_query_get_interpkt(clientES, devAddr):
 def load_from_disk(verbose=False):
     """ Load from disk the dataframe (with parquet)
         
-    :return pd_stats: the pandas dataframe
+    :return pd_all_flows: the pandas dataframe
     3 columns:
     devAddr: string
     median_interpkt_time: delta_time
     nb_pkt: integer
     
     """
-    pd_stats = None
+    pd_all_flows = None
 
     if  os.path.exists(FILENAME_DF):
         if verbose:
-            logger_interpkt.info(" Loading parquet data from " + FILENAME_DF + ":")
-            logger_interpkt.info(" > Reading values ....")
-            logger_interpkt.info("\tdevAddr\t\tnb_pkts\tDisk\tmedian_interpkt_time")
-        pd_stats = pd.read_parquet(FILENAME_DF)
+            logger_preprocflow.info(" Loading parquet data from " + FILENAME_DF + ":")
+            logger_preprocflow.info(" > Reading values ....")
+            logger_preprocflow.info("\tdevAddr\t\tnb_pkts\tDisk\tmedian_interpkt_time")
+        pd_all_flows = pd.read_parquet(FILENAME_DF)
         
         # force some types in the pandaframe
-        pd_stats['nb_pkts'] = pd_stats['nb_pkts'].astype('int')
+        pd_all_flows['nb_pkts'] = pd_all_flows['nb_pkts'].astype('int')
     else:
-        logger_interpkt.info(FILENAME_DF + " doesn't exist.")
+        logger_preprocflow.info(FILENAME_DF + " doesn't exist.")
 
  
-    return(pd_stats)
+    return(pd_all_flows)
     
 
   
-def save_to_disk(pd_stats):
+def save_to_disk(pd_all_flows):
     """ Save to disk the dataframe (with parquet)
         
-    :param pd_stats: the pandas dataframe
+    :param pd_all_flows: the pandas dataframe
     4 columns:
     devAddr: string
     median_interpkt_time: float (seconds)
@@ -298,8 +407,8 @@ def save_to_disk(pd_stats):
 
     
     # savings separately the dataframe without the individual distributions p(arquet format)
-    #pd_stats[['devAddr', 'nb_pkts', 'median_interpkt_time']].to_parquet(FILENAME_DF)
-    pd_stats.to_parquet(FILENAME_DF)
+    #pd_all_flows[['devAddr', 'nb_pkts', 'median_interpkt_time']].to_parquet(FILENAME_DF)
+    pd_all_flows.to_parquet(FILENAME_DF)
    
       
  
@@ -322,9 +431,9 @@ def load_distrib_from_disk(devAddr, verbose=False):
        pd_distrib = pd.read_parquet(filename).squeeze()
          
        if verbose:
-           logger_interpkt.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size))
+           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size))
     else:
-        logger_interpkt.error(filename + " doesn't exist")
+        logger_preprocflow.error(filename + " doesn't exist")
         sys.exit(4)
     
     return(pd_distrib)
@@ -367,7 +476,7 @@ class Application:
     
     """
 
-    def __init__( self, pd_stats ):
+    def __init__( self, pd_all_flows ):
         """ Creation of the app object
         
         """
@@ -375,7 +484,7 @@ class Application:
         self.terminated = False
         
         #stats
-        self.pd_stats = pd_stats
+        self.pd_all_flows = pd_all_flows
  
 
     def _signal_handler( self ):
@@ -392,34 +501,36 @@ class Application:
         """
 
 
-        clientES = tools.elasticsearch_open_connection()
-
+   
         #get the list of devaddrs in the elastic search DB
-        list_devAddr = es_query_get_devAddr(clientES)
+        list_devAddr_pending = es_query_get_devAddr()
         
         # empty pandas dataframe -> let's create it
-        if self.pd_stats is  None:
-            self.pd_stats = pd.DataFrame({'devAddr': [], 'median_interpkt_time': [], 'nb_pkts': []})
+        if self.pd_all_flows is  None:
+            self.pd_all_flows = pd.DataFrame({'devAddr': [], 'flow_id': [], 'median_interpkt_time': [], 'max_time': [], 'min_time': [], 'nb_pkts': []})
             
 
-        # remove the devAddr already handled
+        # remove from the pending list the devAddr already handled
         else:
-            for i in range(0, len(self.pd_stats)) :
-                list_devAddr.remove(self.pd_stats.iloc[i]['devAddr'])
+            for i in range(0, len(self.pd_all_flows)) :
+                list_devAddr_pending.remove(self.pd_all_flows.iloc[i]['devAddr'])
 
 
         #get the inter packet times for a given devAddr
-        logger_interpkt.info("> Reading values ....")
-        logger_interpkt.info("\tdevAddr\t\tnb_pkts\t\tmedian_interpkt_time")
-        for devAddr in list_devAddr :
+        logger_preprocflow.info("> Reading values ....")
+        logger_preprocflow.info("\tdevAddr\t\tnb_pkts\t\tmedian_interpkt_time\tmin\tmax")
+        for devAddr in list_devAddr_pending :
 
-            # get the new record for this devAddr
-            pd_record = eq_query_get_interpkt(clientES, devAddr)
-            logger_interpkt.info("\t" + pd_record['devAddr'][0] + "\t" + str(pd_record['nb_pkts'][0]) + "\t\t" + str(pd_record['median_interpkt_time'][0])   )
-            logger_interpkt.debug("memory: "+ str(sys.getsizeof(self.pd_stats) / (1024 * 1024)) + " MB")
+            # get the new record(s) for this devAddr (one record per flow)
+            pd_records = eq_query_get_interpkt(devAddr)
+                   
+            # concatenation to the global pandaframe
+            self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
 
-            # concantenated to the global pandaframe
-            self.pd_stats = pd.concat([self.pd_stats, pd_record], ignore_index=True)
+            #logs
+            logger_preprocflow.info("\t" + pd_record['devAddr'][0] + "\t" + str(pd_record['nb_pkts'][0]) + "\t\t" + str(pd_record['median_interpkt_time'][0])   )
+            logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
+
  
             #exit condition
             if self.terminated:
@@ -460,7 +571,7 @@ if __name__ == "__main__":
                      
     # ---- disk -----
     # save the pandas frame to the disk
-    save_to_disk(app.pd_stats)
+    save_to_disk(app.pd_all_flows)
 
 
 

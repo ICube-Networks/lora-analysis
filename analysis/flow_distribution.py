@@ -257,10 +257,16 @@ if __name__ == "__main__":
     pd_interpk = extract_interpacket_distribution.load_from_disk()
     logger_flow.info("> done!")
 
-    #print(pd_interpk)
+    print(pd_interpk)
+    
+    devAddr = pd_interpk['devAddr'][5]
+    pd = extract_interpacket_distribution.load_distrib_from_disk(devAddr)
+    print(devAddr)
+    print(pd)
+    
     #print(pd_interpk.iloc[2]['distribution'].to_string())
     #print(pd_interpk.iloc[2]['fCnt'].to_string())
-
+    exit(2)
 
     # --- plots ---
     # plot a grid of distributions (invidividual analysis)
