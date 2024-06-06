@@ -26,6 +26,7 @@ __version__= "1.0"
 import sys
 sys.path.insert(1, '../config')
 sys.path.insert(1, '../tools')
+import glob     #to search filenames with wildcards
 
 # elastic search for the queries
 from elasticsearch import Elasticsearch
@@ -64,16 +65,17 @@ DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 
 AGG_OFFSET = 1000                   # offset for the pagination in the aggregatied query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
-QUERY_NB_RESULT = 10000             #  number of results for our elastic search queries
+QUERY_NB_RESULT = 10000              #  number of results for our elastic search queries
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
 FILENAME_DF = 'data/dataset.parquet'# the name of the file to read/write the data frames
 FILENAME_DISTRIB = 'data/distrib_'  # the prefix of the filenames for the distribution
 
 # conditions for a new flow
 DELTA_FCNT_REL_MAX = 10              # relative diff: if the counter diff exceeds DELTA * max()
-DELTA_FCNT_ABS_MAX = 30             # absolute diff: if the counter diff exceeds DELTA
-DELTA_INTERPKT_TIME_MAX = 3         # if the inter-packet time exceeds DELTA * max
-      
+DELTA_FCNT_ABS_MAX = 30              # absolute diff: if the counter diff exceeds DELTA
+DELTA_INTERPKT_ABS_TIME_MAX = 86400000  # if the inter-packet time exceeds 1 day (epoch in ms)
+DELTA_INTERPKT_REL_TIME_MAX = 3      # if the inter-packet time exceeds DELTA * max
+
 # --------------------------------------------------------
 #       ELASTIC SEARCH QUERIES
 # --------------------------------------------------------
@@ -130,12 +132,12 @@ def es_query_get_devAddr():
         
         # no more record
         if (len(response["aggregations"]["devAddr"]["buckets"]) == 0):
-            logger_preprocflow.info("Elastic search: last page for the aggregate query")
+            logger_preprocflow.debug("Elastic search: last page for the aggregate query")
             break;
         
         
         # dump the json response for debug (VERY verbose !!)
-        logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
+        #logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
         
         # add the corresponding devAddr in the list
         for record in response["aggregations"]["devAddr"]["buckets"]:
@@ -150,13 +152,13 @@ def es_query_get_devAddr():
  
    
 #create a record for this flow (and save its distribution on the disk)
-def pd_create_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib):
+def pd_save_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib):
 
     #logger_preprocflow.debug(devAddr + " (list size) -> " + str(pd_distrib.size))
 
     #save the raw distribution (dataframe in a file)
     save_distrib_to_disk(pd_distrib, devAddr, fCnt_1st)
-
+    
     # new record to add
     if pd_distrib.size > 0:
         record = {
@@ -180,12 +182,14 @@ def pd_create_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distr
             'time_1st': time_1st,
             'time_last': time_last,
             'median_interpkt_time': [pd.NaT,],
-            'max_fCnt_diff': pd_distrib['fCnt_diff'].max(),
+            'max_fCnt_diff': [pd.NaT,],
             'median_fCnt_diff': [pd.NaT,],
-            'max_time': pd_distrib['interpkt_time'].max(),
-            'min_time': pd_distrib['interpkt_time'].min(),
+            'max_time': [pd.NaT,],
+            'min_time': [pd.NaT,],
             'nb_pkts': [pd_distrib.size + 1,] ,        # number of packets = length of the list + one
        }
+       
+    del(pd_distrib)
 
     return(record)
 
@@ -219,9 +223,18 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
                 ],
             }
         },
+ #       runtime_mappings= {
+ #           "mqtt_time_epoch_seconds": {
+ #               "type": "keyword",
+ #               "script": {
+ #                   "source": "ZonedDateTime zdt = ZonedDateTime.parse(doc['mqtt_time'].value.toString()); emit(zdt.toEpochMilli().toString())"
+ #               }
+ #           }
+ #       },
         fields=[
             "mqtt_time",
             "extra_infos.phyPayload.macPayload.fhdr.fCnt",
+  #          "mqtt_time_epoch_seconds",
             "_id",
         ],
         sort=[
@@ -232,7 +245,7 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
     )
     
     # dump the json response for debug (VERY verbose !!)
-    logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
+    #logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
 
     # next page for the query
     length = len(response["hits"]["hits"])
@@ -276,64 +289,60 @@ def eq_query_get_interpkt(devAddr):
         if (length == 0):
             break
 
-        #pointer to the last packet of the flow (initially, packet 0)
-        pointer_last_pkt_of_the_flow = 0
-
         # computes the inter packet time
         for i in range(1, len(response["hits"]["hits"])  - 1):
             found = False
-                                
                         
+            current_packet_data = response["hits"]["hits"][i]
+            time_current = current_packet_data["sort"][0]
+            fCnt_current = current_packet_data["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0]
+
             #search for an active flow to which the current packet may correspond
             for flow in flows_for_thisDevAddr:
-             
-                #time difference
-                diff_time = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH) \
-                - \
-                flow['time']
-
-                #frame counter difference
-                fCnt_diff = response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0] - flow['fCnt_last']
-            
- 
+                time_difference = time_current - flow['epochtime_last']
+                
                 # is it same flow ?
-                # 1st condition: the different for the sequence number does not exceed an absolute and relative value (relative to the max)
-                if  (fCnt_diff >= 0):
-                    if (pd.isna(flow['pd_distrib']['fCnt_diff'].max()) or (fCnt_diff < DELTA_FCNT_REL_MAX * flow['pd_distrib']['fCnt_diff'].max())) and (fCnt_diff < DELTA_FCNT_ABS_MAX):
-                        
-                        # 2nd condition: the time between two packets does not exceed a given value
-                        if (pd.isna(flow['pd_distrib']['interpkt_time'].max())) or (diff_time.total_seconds() <= 1000 * flow['pd_distrib']['interpkt_time'].max()):
-                            
-                            # ok, this packet corresponds to the flow
-                            found = True
-                          
-                                              
-                            # update the current fcnt value for this flow (this is my new reference for this flow)
-                            flow['fCnt_last'] = response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0]
-                            flow['time'] = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
-                            flow['time_last'] = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
+                # 1nd condition: the time between two packets does not exceed a given DELTA value
+                #the sorting field is the mqtt_time (in epoch format)
+                #diff_time = response["hits"]["hits"][i]["sort"][0] - flow['time_last']
+                if (time_difference <=  flow['interpkttime_max']):
+                  
+                    #frame counter difference
+                    fCnt_difference = fCnt_current - flow['fCnt_last']
+                   
+                    # 2nd condition: the different for the sequence number does not exceed a given DELTA value
+                    if  0 <= fCnt_difference < DELTA_FCNT_ABS_MAX:
 
-                             
-                            # create a pandas record at the end of the distrib
-                            flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
-                                diff_time.total_seconds(),
-                                fCnt_diff,
-                                response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0]
-                            ]
-                          
-                            break;
-        
+                        # ok, this packet corresponds to the flow
+                        found = True
+                                          
+                        # update the current fcnt value for this flow (this is my new reference for this flow)
+                        flow['fCnt_last'] = max(flow['fCnt_last'], fCnt_current)
+                        flow['epochtime_last'] = time_current
+                        flow['interpkttime_max'] = max(flow['interpkttime_max'], time_difference * DELTA_INTERPKT_REL_TIME_MAX)
+                        flow['time_last'] = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
+
+                        # create a pandas record at the end of the distrib
+                        flow['pd_distrib'].loc[-1] = [
+                            time_difference,
+                            fCnt_difference,
+                            fCnt_current
+                        ]
+                        break  # exit loop since packet corresponds to the flow, no need to further iterate.
+            
+
             
             #no flow exists -> create a new one for this devAddr
             if found is False:
                 
                 # a new flow is created
                 flows_for_thisDevAddr.append({
-                    'fCnt_1st': response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0],
-                    'fCnt_last': response["hits"]["hits"][i]["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0],
+                    'fCnt_1st': fCnt_current,
+                    'fCnt_last': fCnt_current,
                     'time_1st': datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
                     'time_last': datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
-                    'time': datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
+                    'epochtime_last': time_current,
+                    'interpkttime_max': DELTA_INTERPKT_ABS_TIME_MAX,
                     'pd_distrib': pd.DataFrame({'interpkt_time': [], 'fCnt_diff': [], 'fCnt': []}),
                 })
                 
@@ -353,12 +362,12 @@ def eq_query_get_interpkt(devAddr):
         
         #flush if still one pending record
         if (len(flow['pd_distrib']) > 0):
-            record = pd_create_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
+            record = pd_save_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
+            
             if 'pd_these_flows' not in locals():
                 pd_these_flows = pd.DataFrame(data=record)
             else:
                 pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record)], ignore_index=True)
-
 
     return(pd_these_flows)
 
@@ -384,12 +393,11 @@ def load_from_disk(verbose=False):
     
     """
     pd_all_flows = None
+           
+    logger_preprocflow.info("Loading parquet data from " + FILENAME_DF + ":")
+    logger_preprocflow.info("\t> Reading values ....")
 
     if  os.path.exists(FILENAME_DF):
-        if verbose:
-            logger_preprocflow.info(" Loading parquet data from " + FILENAME_DF + ":")
-            logger_preprocflow.info(" > Reading values ....")
-            logger_preprocflow.info("\tdevAddr\t\tnb_pkts\tDisk\tmedian_interpkt_time")
         pd_all_flows = pd.read_parquet(FILENAME_DF)
         
         # force some types in the pandaframe
@@ -397,7 +405,7 @@ def load_from_disk(verbose=False):
     else:
         logger_preprocflow.info(FILENAME_DF + " doesn't exist.")
 
- 
+
     return(pd_all_flows)
     
 
@@ -426,22 +434,21 @@ def load_distrib_from_disk(devAddr, verbose=False):
         
     :param devAddr: the devAddr to read
     
-    :returns: a dataframe with the raw distribution (inter packet time + fCnt)
+    :returns: a list of dataframes with the raw distribution (inter packet time + fCnt + etc.)
     
-    :rtype: pandas dataframe
+    :rtype: list of dataframes
     
     """
      
-    filename = FILENAME_DISTRIB + devAddr + '.parquet'
+    
+    pd_distrib = []
      
-    if os.path.exists(filename) :
-       pd_distrib = pd.read_parquet(filename).squeeze()
+    filenames = glob.glob(FILENAME_DISTRIB + devAddr + '*.parquet')
+    for filename in filenames:
+       pd_distrib.append(pd.read_parquet(filename).squeeze())
          
        if verbose:
-           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size))
-    else:
-        logger_preprocflow.error(filename + " doesn't exist")
-        sys.exit(4)
+           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size) + " filename=" + filename)
     
     return(pd_distrib)
     
@@ -521,36 +528,41 @@ class Application:
         # NB: a devAddr may correspond to multiple flows. But when a devAddr is processed, all the corresponding flows are also
         else:
             devAddr_proc = self.pd_all_flows['devAddr'].drop_duplicates()
-            logger_preprocflow.info("\t> " + str(len(devAddr_proc)) + " devAddr already processed and saved in local")
-            for addr in devAddr_proc:
-                logger_preprocflow.debug("\t\t" + addr)
-                list_devAddr_pending.remove(addr)
+          
+            logger_preprocflow.info(str(len(devAddr_proc)) + " devAddr already processed and saved in local:")
+            logger_preprocflow.info("\tdevAddr\t\tNb flows")
+           
+            for devAddr in devAddr_proc:
+                list_devAddr_pending.remove(devAddr)
+                
+                if (logger_preprocflow.getEffectiveLevel() >= logging.INFO):
+                    pd_records = load_distrib_from_disk(devAddr, verbose=False)
+                    logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records))  )
+                logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
 
 
         #get the inter packet times for a given devAddr
         logger_preprocflow.info("> Reading new values in Elastic Search ....")
-        logger_preprocflow.info("\tdevAddr\t\tnb_pkts\t\tmedian_interpkt_time\tmin\tmax")
+        logger_preprocflow.info("\tdevAddr\t\tNb flows")
         for devAddr in list_devAddr_pending :
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
-                   
+                    
             # concatenation to the global pandaframe
             self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
 
-            print(pd_records)
-
-
             #logs
-            logger_preprocflow.info("\t" + pd_records['devAddr'][0] + "\t" + str(pd_records['nb_pkts'][0]) + "\t\t" + str(pd_records['median_interpkt_time'][0])   )
+            logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0])  )
             logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
+            #pd.set_option('display.max_rows', None)
+            #print(pd_records)
 
  
             #exit condition
             if self.terminated:
                 print("------- Application interrupted ----- ")
                 break
-
       
       
       
@@ -567,7 +579,6 @@ if __name__ == "__main__":
  
     """
     
-      
     # ---- disk -----
     # load data that is on the disk (already read previously)
     pd_disk = load_from_disk(verbose=True)

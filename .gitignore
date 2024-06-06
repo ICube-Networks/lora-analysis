@@ -167,6 +167,8 @@ lora-strasbourg-analysis.xcodeproj
 docs/_*
 docs/Makefile
 
+#seafile
+seafile-ignore.txt
 
 #private files
 config/myconfig.py
