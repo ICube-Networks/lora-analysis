@@ -59,18 +59,17 @@ logging.basicConfig(stream=sys.stdout)
 ############################################################
 
 
-def  es_query_SF(clientES):
+def  es_query_SF():
     """Elastic search query for an histogram.
     
     This function sends a query to an elastic search server  to retrieve an histogram (per week) of the number of packets per SF
-    
-    :param Elasticsearch clientES: a connection to an elastic search server
     
     :returns: a pandas DataFrame which contains the counts for each window of the histogram
     :rtype: DataFrame
     """
 
-
+    #open the connection
+    clientES = tools.elasticsearch_open_connection()
 
     #get the number of valid records per SF per channel
     resp = clientES.options(
@@ -156,19 +155,10 @@ if __name__ == "__main__":
     """Executes the script to plot the histogram of the number of packets per SF
  
     """
-        
 
-    #elastic connection
-    DEBUG_ES = False
-    clientES = Elasticsearch(
-        "https://localhost:9200",
-        verify_certs=False,
-        ssl_show_warn=False,
-    )
-    logger_sf.info(clientES)
-
+  
     #elastic search query, transformed in a panda dataFrame
-    results_df = es_query_SF(clientES)
+    results_df = es_query_SF()
     logger_sf.info(results_df)
     
     #plot it

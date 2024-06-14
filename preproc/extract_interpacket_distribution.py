@@ -73,7 +73,7 @@ FILENAME_DISTRIB = 'data/distrib_'  # the prefix of the filenames for the distri
 # conditions for a new flow
 DELTA_FCNT_REL_MAX = 10              # relative diff: if the counter diff exceeds DELTA * max()
 DELTA_FCNT_ABS_MAX = 30              # absolute diff: if the counter diff exceeds DELTA
-DELTA_INTERPKT_ABS_TIME_MAX = 86400000  # if the inter-packet time exceeds 1 day (epoch in ms)
+DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # if the inter-packet time exceeds 1 day (epoch in ms)
 DELTA_INTERPKT_REL_TIME_MAX = 3      # if the inter-packet time exceeds DELTA * max
 
 # --------------------------------------------------------
@@ -282,7 +282,7 @@ def eq_query_get_interpkt(devAddr):
     
         #tx the elastic search query to the server
         response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
-        logger_preprocflow.info("New Elastic Search query (" + str(QUERY_NB_RESULT) + " records at most)")
+        logger_preprocflow.debug("New Elastic Search query (" + str(QUERY_NB_RESULT) + " records at most)")
             
         #no remaining response
         length = len(response["hits"]["hits"])
@@ -368,6 +368,12 @@ def eq_query_get_interpkt(devAddr):
                 pd_these_flows = pd.DataFrame(data=record)
             else:
                 pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record)], ignore_index=True)
+    
+    if 'pd_these_flows' not in locals():
+        print(flows_for_thisDevAddr)
+    
+    if 'pd_these_flows' not in locals():
+        return(None)
 
     return(pd_these_flows)
 
@@ -548,15 +554,17 @@ class Application:
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
-                    
+            
             # concatenation to the global pandaframe
-            self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
+            if pd_records is not None :
+                self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
 
-            #logs
-            logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0])  )
-            logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
-            #pd.set_option('display.max_rows', None)
-            #print(pd_records)
+                #logs
+                logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0])  )
+                logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
+            else:
+                logger_preprocflow.info("\t" + devAddr + "\t0" )
+
 
  
             #exit condition

@@ -22,6 +22,7 @@ fi
 INDEX_NAME=`cat ../config/myconfig.py | grep "index_name" | cut -d '"' -f 2`
 USER=`cat ../config/myconfig.py | grep "user" | cut -d '"' -f 2`
 PASSWORD=`cat ../config/myconfig.py | grep "password" | cut -d '"' -f 2`
+IP_ADDR=`cat ../config/myconfig.py | grep "ip_server" | cut -d '"' -f 2`
 
 #npm verification
 if ! npm -v &> /dev/null
@@ -37,7 +38,7 @@ then
     npm install elasticdump
 fi
 
-IP_ADDR="127.0.0.1"
+
 
 
 
