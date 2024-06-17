@@ -9,15 +9,47 @@ The repository is structured as follows:
 
 # Installation
 
-## Docker
+## Elastic Search & Kibana
+
+
+We propose two options:
+* Docker
+* Virtual Machines (e.g., Open Nebula)
+
+In any case, the installation produces `config/myconfig.py` including all the parameters and credentials. This python script is typically included by all oter Python scripts to get the local parameters of the installation (IP address of the server, credentials, etc.)
+
+You should read the messages printed at the end of the installation process to see the procedure to connect Kibana and Elastic Search (a manual procedure is still needed):
+
+* Use your browser to visit `http://IP_VM:5601` and use the enrollment key and the verification code provided by the script (both in the output and in `myconfig.py`)
+
+* You can use the Kibana interface to dig into the elastic search index ``http://IP_VM:5601``
+
+
+
+### Docker
+
 We provide the scripts for a docker installation of Kibana and elastic search. 
-Please run: `docker_create_elastic_servers`
 
-* The installation produces `config/myconfig.py` including all the parameters and credentials 
+* one container for Elastic Search, another container for Kibana
 
-* Use your browser to visit `http://localhost:5601` and use the enrollment key and the verification code provided by the script (both in the output and in `myconfig.py`)
+	* you can select the version number in the scripts
 
-* You can use the Kibana interface to dig into the elastic search index ``http://localhost:5601``
+* Please run: `docker_create_elastic_servers`
+
+
+
+### Virtual Machines
+
+We provide the scripts for a VM installation of Kibana and elastic search.
+
+* one VM for Kibana + one elastic search node
+
+* other VM for other elastic search nodes to create a cluster (not yet supported)
+ 
+* Please run: `vm_create_elastic_servers.sh`
+
+
+
 
 ## Python packages
 
@@ -34,16 +66,12 @@ You can install them with:
 * `source .venv/bin/activate`
 * `pip install -r install/requirements.txt`
 
+
+
 ## Elasticdump
 
-We rely on elasticdump () to backup and restore the dataset:
+We rely on elasticdump () to backup and restore the dataset. npm and the `elasticdump`package are automatically installed when you run the scripts.
 
-* `npm install elasticdump@6.104.0`
-
-**Caution**: more recent versions of elasticdump seem **not working** (for an unknown reason, no error message)
-
-
-## Dataset 
 
 We provide the following scripts to dump/load data in elastic search servers:
 
@@ -52,7 +80,7 @@ We provide the following scripts to dump/load data in elastic search servers:
 * `elasticdump_load_data.sh` is a bash script to connect to the local installation and that injects the dump in the local elastic search instance
 
 
-You can explore the dataset in Kibana (cf. install section), by default: [http://localhost:5601/app/enterprise_search/content/search_indices/lora-index](http://localhost:5601/app/enterprise_search/content/search_indices/lora-index)
+You can explore the dataset in Kibana (cf. install section), by default: [http://IP@_ES_SERVER:5601/app/enterprise_search/content/search_indices/lora-index](http://IP@_ES_SERVER:5601/app/enterprise_search/content/search_indices/lora-index)
 
 
 
@@ -60,11 +88,29 @@ You can explore the dataset in Kibana (cf. install section), by default: [http:/
 
 ## Structuration
 
-* All scripts use `myconfig.py` to store the credentials for elastic search.
-* All plots are saved in pdf format in the `analysis/figures` directory. 
+* All scripts use `myconfig.py` to store the parameters (IP address of the server, credentials) for elastic search.
+
+* All plots are saved in pdf format in the `analysis/figures` directory. Then should be run in the following order
 
 
-## Scripts
+
+
+## Pre-Processing
+
+We regrouped all the scripts for the pre-processing in the `preproc` directory:
+
+1. `insert_extra_infos.py`: insert LoRa information, by dissecting LoRa frames (additional fields per record in the index);
+2. `insert_dup_infos`: identify duplicated packets, flagged accordingly in the index;
+3. `extract_interpacket_distribution`: extract for each address the sequence of packets, chronologically ordered.
+**Disclaimer:** several devices may share the same address, thus we implemented an algorithm to infer the different flows sharing the same address
+
+
+All these scripts can be stopped and restarted at any time: they will continue where they stopped. 
+
+
+
+
+## Analaysis
 
 You should use a local venv for your Python packages, and activate it (`source .venv/bin/activate`). Please see the install section.
 
