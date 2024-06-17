@@ -362,13 +362,6 @@ def eq_query_get_interpkt(devAddr):
     #we must now flush all the distributions in pd_these_flows
     for flow in flows_for_thisDevAddr:
         
-        #if devAddr == "00000006" :
-        #    print("------")
-        #    print(devAddr)
-        #    print(flow)
-        #    print("nb flows " + str(len(response["hits"]["hits"])))
-        
-        
         #flush if still one pending record
         if (len(flow['pd_distrib']) > 0):
             record = pd_save_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
@@ -379,8 +372,9 @@ def eq_query_get_interpkt(devAddr):
                 pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record)], ignore_index=True)
     
     if 'pd_these_flows' not in locals():
-        print(flows_for_thisDevAddr)
-        print("---- No flow for this devAddr --")
+        logger_preprocflow.error("No flow for the devAddr" + str(devAddr))
+            
+      
         return(None)
 
     return(pd_these_flows)
@@ -548,14 +542,6 @@ class Application:
            
             for devAddr in devAddr_proc:
                 list_devAddr_pending.remove(devAddr)
-                
-               # if devAddr == "00000006" :
-               #     print("------")
-               #     print(devAddr)
-               #     pd_records = load_distrib_from_disk(self.pd_all_flows, devAddr, verbose=False)
-               #     print(pd_records)
-
-                    
                 
                 if (logger_preprocflow.getEffectiveLevel() >= logging.INFO):
                     pd_records = load_distrib_from_disk(self.pd_all_flows, devAddr, verbose=False)
