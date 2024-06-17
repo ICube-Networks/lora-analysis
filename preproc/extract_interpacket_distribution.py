@@ -71,10 +71,12 @@ FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file t
 FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the filenames for the distribution
 
 # conditions for a new flow
-DELTA_FCNT_REL_MAX = 10              # relative diff: if the counter diff exceeds DELTA * max()
 DELTA_FCNT_ABS_MAX = 30              # absolute diff: if the counter diff exceeds DELTA
 DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # if the inter-packet time exceeds 1 day (epoch in ms)
 DELTA_INTERPKT_REL_TIME_MAX = 3      # if the inter-packet time exceeds DELTA * max
+
+#
+
 
 # --------------------------------------------------------
 #       ELASTIC SEARCH QUERIES
@@ -360,6 +362,13 @@ def eq_query_get_interpkt(devAddr):
     #we must now flush all the distributions in pd_these_flows
     for flow in flows_for_thisDevAddr:
         
+        #if devAddr == "00000006" :
+        #    print("------")
+        #    print(devAddr)
+        #    print(flow)
+        #    print("nb flows " + str(len(response["hits"]["hits"])))
+        
+        
         #flush if still one pending record
         if (len(flow['pd_distrib']) > 0):
             record = pd_save_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
@@ -371,8 +380,7 @@ def eq_query_get_interpkt(devAddr):
     
     if 'pd_these_flows' not in locals():
         print(flows_for_thisDevAddr)
-    
-    if 'pd_these_flows' not in locals():
+        print("---- No flow for this devAddr --")
         return(None)
 
     return(pd_these_flows)
@@ -435,7 +443,7 @@ def save_to_disk(pd_all_flows):
  
 
 
-def load_distrib_from_disk(devAddr, verbose=False):
+def load_distrib_from_disk(pd_all_flows, devAddr, verbose=False):
     """ load each individual distribution from the disk into a dataframe (with parquet)
         
     :param devAddr: the devAddr to read
@@ -448,13 +456,16 @@ def load_distrib_from_disk(devAddr, verbose=False):
      
     
     pd_distrib = []
-     
-    filenames = glob.glob(FILENAME_DISTRIB + devAddr + '*.parquet')
-    for filename in filenames:
-       pd_distrib.append(pd.read_parquet(filename).squeeze())
-         
-       if verbose:
+
+    #get all the fCnt_1st for theis devAddr
+    for fCnt_1st in pd_all_flows[pd_all_flows['devAddr']== devAddr]['fCnt_1st']:
+    
+        filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(fCnt_1st) + '.parquet'
+        pd_distrib.append(pd.read_parquet(filename_distrib).squeeze())
+ 
+        if verbose:
            logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size) + " filename=" + filename)
+ 
     
     return(pd_distrib)
     
@@ -471,14 +482,10 @@ def save_distrib_to_disk(pd_distrib, devAddr, fCnt_1st):
      
     filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(fCnt_1st) + '.parquet'
     
-    # if only one packet -> nan, else store the timeseries in individual files
-    if pd_distrib.size > 0 :
-        pd_distrib.to_parquet(filename_distrib)
+    # store the timeseries in individual files
+    pd_distrib.to_parquet(filename_distrib)
  
-    else:
-        pd.DataFrame([np.nan]).to_parquet(filename_distrib)
   
-
 
   
   
@@ -525,13 +532,14 @@ class Application:
         #get the list of devaddrs in the elastic search DB
         list_devAddr_pending = es_query_get_devAddr()
         
-        # empty pandas dataframe -> let's create it
+        # empty pandas dataframe (none read from the disk) -> let's create it
         if self.pd_all_flows is  None:
             self.pd_all_flows = pd.DataFrame({'devAddr': [], 'fCnt_1st': [], 'fCnt_last': [], 'time_1st': [], 'time_last': [], 'median_interpkt_time': [], 'max_time': [], 'min_time': [], 'nb_pkts': []})
             
 
+        # Else, some have already been extracted from the disk
         # remove from the pending list the devAddr already handled
-        # NB: a devAddr may correspond to multiple flows. But when a devAddr is processed, all the corresponding flows are also
+        # NB: a devAddr may correspond to multiple flows. But when a devAddr is processed, all the corresponding flows are also processed
         else:
             devAddr_proc = self.pd_all_flows['devAddr'].drop_duplicates()
           
@@ -541,12 +549,16 @@ class Application:
             for devAddr in devAddr_proc:
                 list_devAddr_pending.remove(devAddr)
                 
-                print(list_devAddr_pending)
-                print("------")
-                print(devAddr)
+               # if devAddr == "00000006" :
+               #     print("------")
+               #     print(devAddr)
+               #     pd_records = load_distrib_from_disk(self.pd_all_flows, devAddr, verbose=False)
+               #     print(pd_records)
+
+                    
                 
                 if (logger_preprocflow.getEffectiveLevel() >= logging.INFO):
-                    pd_records = load_distrib_from_disk(devAddr, verbose=False)
+                    pd_records = load_distrib_from_disk(self.pd_all_flows, devAddr, verbose=False)
                     logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records))  )
                 logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
 
@@ -561,7 +573,10 @@ class Application:
             
             # concatenation to the global pandaframe
             if pd_records is not None :
-                self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
+                if self.pd_all_flows.empty is True:
+                    self.pd_all_flows = pd_records
+                else:
+                    self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
 
                 #logs
                 logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0])  )
@@ -594,7 +609,6 @@ if __name__ == "__main__":
     # ---- disk -----
     # load data that is on the disk (already read previously)
     pd_disk = load_from_disk(verbose=True)
-
 
     
     # -- elastic search ----

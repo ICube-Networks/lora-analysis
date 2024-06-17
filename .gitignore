@@ -177,6 +177,8 @@ config/myconfig.py
 install/data*/*
 analysis/data/*
 preproc/data/*
+data/*
+
 
 # node js installation
 node_modules/*
