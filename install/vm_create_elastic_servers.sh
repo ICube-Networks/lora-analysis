@@ -12,6 +12,7 @@ CONFIG_FILE="../config/myconfig.py"
 EMAIL="theoleyre@unistra.fr"
 
 
+
 echo "*******************************************"
 echo "*      CERTIFICATES    *"
 echo "*******************************************"
@@ -144,7 +145,7 @@ echo "cert_fingerprint=\"${ES_CERT_FINGER//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 echo "hostname=\"${VM_MANAGER_HOSTNAME//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 echo "enrollment_key=\"${ES_ENROL_KEY//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 echo "verif_code=\"${KIB_CODE_VERIF//[$'\t\r\n ']}\"" >> $CONFIG_FILE
-echo "ip_server=\"${VM_MANAGER//[$'\t\r\n ']}\"" >> $CONFIG_FILE
+echo "echo "directory_data=\"`cd ..; pwd`/data/\"" >> $CONFIG_FILE
 
 
 

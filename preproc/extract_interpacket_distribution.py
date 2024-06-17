@@ -67,8 +67,8 @@ AGG_OFFSET = 1000                   # offset for the pagination in the aggregati
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 QUERY_NB_RESULT = 10000              #  number of results for our elastic search queries
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
-FILENAME_DF = 'data/dataset.parquet'# the name of the file to read/write the data frames
-FILENAME_DISTRIB = 'data/distrib_'  # the prefix of the filenames for the distribution
+FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file to read/write the data frames
+FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the filenames for the distribution
 
 # conditions for a new flow
 DELTA_FCNT_REL_MAX = 10              # relative diff: if the counter diff exceeds DELTA * max()
@@ -540,6 +540,10 @@ class Application:
            
             for devAddr in devAddr_proc:
                 list_devAddr_pending.remove(devAddr)
+                
+                print(list_devAddr_pending)
+                print("------")
+                print(devAddr)
                 
                 if (logger_preprocflow.getEffectiveLevel() >= logging.INFO):
                     pd_records = load_distrib_from_disk(devAddr, verbose=False)
