@@ -175,9 +175,7 @@ config/myconfig.py
 
 #datasets
 install/data*/*
-analysis/data/*
-preproc/data/*
-data/*
+data/*.parquet
 
 
 # node js installation

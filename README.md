@@ -62,6 +62,7 @@ We rely on the following Python packages:
 
 You can install them with:
 
+* `apt-get install python3-venv` if the package is not yest installed on your system (debian-like distribution) 
 * `python3 -m venv .venv`
 * `source .venv/bin/activate`
 * `pip install -r install/requirements.txt`

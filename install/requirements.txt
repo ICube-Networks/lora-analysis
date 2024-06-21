@@ -5,3 +5,5 @@ pandas
 requests
 seaborn
 flask
+pyarrow
+fastparquet
