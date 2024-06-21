@@ -325,11 +325,12 @@ def eq_query_get_interpkt(devAddr):
                         flow['time_last'] = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
 
                         # create a pandas record at the end of the distrib
-                        flow['pd_distrib'].loc[-1] = [
+                        flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
                             time_difference,
                             fCnt_difference,
                             fCnt_current
                         ]
+
                         break  # exit loop since packet corresponds to the flow, no need to further iterate.
             
 
@@ -356,8 +357,7 @@ def eq_query_get_interpkt(devAddr):
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < QUERY_NB_RESULT):
             break
-   
-   
+
    
     #we must now flush all the distributions in pd_these_flows
     for flow in flows_for_thisDevAddr:
@@ -437,14 +437,14 @@ def save_to_disk(pd_all_flows):
  
 
 
-def load_distrib_from_disk(pd_all_flows, devAddr, verbose=False):
-    """ load each individual distribution from the disk into a dataframe (with parquet)
+def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
+    """ load a list of individual distribution from the disk into a dataframe (with parquet)
         
     :param devAddr: the devAddr to read
     
     :returns: a list of dataframes with the raw distribution (inter packet time + fCnt + etc.)
     
-    :rtype: list of dataframes
+    :rtype: a list of dataframe (be careful, several flows may be included, since several flows can be associated to the same devAddr)
     
     """
      
@@ -455,7 +455,7 @@ def load_distrib_from_disk(pd_all_flows, devAddr, verbose=False):
     for fCnt_1st in pd_all_flows[pd_all_flows['devAddr']== devAddr]['fCnt_1st']:
     
         filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(fCnt_1st) + '.parquet'
-        pd_distrib.append(pd.read_parquet(filename_distrib).squeeze())
+        pd_distrib.append(pd.read_parquet(filename_distrib)
  
         if verbose:
            logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size) + " filename=" + filename)
@@ -464,6 +464,28 @@ def load_distrib_from_disk(pd_all_flows, devAddr, verbose=False):
     return(pd_distrib)
     
     
+def load_distribs_forDevAddr_and_fCnt_1st_from_disk(devAddr, fCnt_1st, verbose=False):
+    """ load one distribution from the disk into a dataframe (with parquet)
+        
+    :param devAddr: the devAddr to read
+    
+    :param fCnt_1st: the fCnt_1st to read
+
+    :returns: the raw distribution (inter packet time + fCnt + etc.)
+    
+    :rtype: dataframe
+    
+    """
+     
+    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(fCnt_1st) + '.parquet'
+    pd_distrib = pd.read_parquet(filename_distrib)
+    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size) + " filename=" + filename_distrib)
+    
+     
+    return(pd_distrib)
+
+
+
      
 def save_distrib_to_disk(pd_distrib, devAddr, fCnt_1st):
     """ Save to disk a dataframe (with parquet)
@@ -474,10 +496,11 @@ def save_distrib_to_disk(pd_distrib, devAddr, fCnt_1st):
     fCnt: integer, the frame counter of LoRa
     """
      
-    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(fCnt_1st) + '.parquet'
-    
     # store the timeseries in individual files
+    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(fCnt_1st) + '.parquet'
+    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib.size) + " filename=" + filename_distrib)
     pd_distrib.to_parquet(filename_distrib)
+ 
  
   
 
