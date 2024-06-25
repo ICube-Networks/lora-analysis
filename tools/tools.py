@@ -183,13 +183,32 @@ class queries:
     """
     Query to match all the documents that have an extra_infos field.
     """
-    
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST_NODUP =  {
             "bool": {
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
 
+              ],
+              "must": [
+                    {
+                      "exists": {
+                      "field": "extra_infos"
+                     }
+                  }
+                ]
+            }
+        }
+        
+    """
+    Query to match all the documents that have an extra_infos field.
+    """
+    # fields extra_info exist for the frame
+    QUERY_DATA_NODUP_FOR_DEVADDR =  {
+            "bool": {
+              "filter" : [
+                    {"match": {"dup_infos.is_duplicate": False}},
+                    { "match":  { "extra_infos.phyPayload.macPayload.fhdr.devAddr": "000173b7" }},
               ],
               "must": [
                     {
