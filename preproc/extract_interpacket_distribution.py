@@ -153,14 +153,9 @@ def es_query_get_devAddr():
     return(list_devAddr)
  
    
-#create a record for this flow (and save its distribution on the disk)
-def pd_save_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib):
-
-    #logger_preprocflow.debug(devAddr + " (list size) -> " + str(pd_distrib['interpkt_time'].size))
-
-    #save the raw distribution (dataframe in a file)
-    save_distrib_to_disk(pd_distrib, devAddr, time_1st)
-    
+#create a record for this flow
+def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib):
+   
     # new record to add
     if pd_distrib.size > 0:
         record = {
@@ -190,10 +185,7 @@ def pd_save_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib
             'min_time': [pd.NaT,],
             'nb_pkts': [pd_distrib['interpkt_time'].size + 1,] ,        # number of packets = length of the list + one
        }
-       
     
-    del(pd_distrib)
-
     return(record)
 
 
@@ -278,7 +270,7 @@ def eq_query_get_interpkt(devAddr):
     # -> ordered chronologically (by mqtt_time)
     mqtt_time_min = 0
      
-    #list of flows for this devAddr
+    #list of flows for this devAddr: empty (we will add a flow when we detect a new one)
     flows_for_thisDevAddr = []
     test = 0
     
@@ -288,14 +280,16 @@ def eq_query_get_interpkt(devAddr):
         #tx the elastic search query to the server
         response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
         logger_preprocflow.debug("New Elastic Search query (" + str(QUERY_NB_RESULT) + " records at most)")
-            
+        
         #no remaining response
         length = len(response["hits"]["hits"])
+        
         if (length == 0):
+            logger_preprocflow.error("No packet matches for devAddr " + devAddr)
             break
 
-        # computes the inter packet time
-        for i in range(1, len(response["hits"]["hits"])  - 1):
+        # identification of the flows for all the packets
+        for i in range(0, len(response["hits"]["hits"])): #  - 1):
             found = False
                         
             current_packet_data = response["hits"]["hits"][i]
@@ -381,27 +375,29 @@ def eq_query_get_interpkt(devAddr):
             break
 
    
-    #we must now flush all the distributions in pd_these_flows
+    #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
+
+        #save the raw distribution (dataframe in a file)
+        save_distrib_to_disk(pd_distrib=flow['pd_distrib'], devAddr=devAddr, time_1st=flow['time_1st'])
+
+        #extract the summarized record only
+        record_summary = extract_flow_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
+          
+        # the individual values are not anymore useful
+        del(flow['pd_distrib'])
+
+        #print( "size=" + str(flow['pd_distrib']['interpkt_time'].size + 1) + " nbPkts="+ str(record['nb_pkts'])+ " fCnt_1st="+ str(record['fCnt_1st'])+ " devAddr="+ str(record['devAddr']))
         
-        #flush if still one pending record
-        if (len(flow['pd_distrib']) > 0):
-        
-       
-            record = pd_save_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
-            
-            #print( "size=" + str(flow['pd_distrib']['interpkt_time'].size + 1) + " nbPkts="+ str(record['nb_pkts'])+ " fCnt_1st="+ str(record['fCnt_1st'])+ " devAddr="+ str(record['devAddr']))
- 
-            
-            if 'pd_these_flows' not in locals():
-                pd_these_flows = pd.DataFrame(data=record)
-            else:
-                pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record)], ignore_index=True)
-    
+        #add this flow to the list of flows for this devAddr
+        if 'pd_these_flows' not in locals():
+            pd_these_flows = pd.DataFrame(data=record_summary)
+        else:
+            pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record_summary)], ignore_index=True)
+
+
     if 'pd_these_flows' not in locals():
-        logger_preprocflow.error("No flow for the devAddr" + str(devAddr))
-            
-      
+        logger_preprocflow.error("No flow for the devAddr " + str(devAddr))
         return(None)
 
     return(pd_these_flows)
@@ -482,7 +478,7 @@ def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
     
         filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(time_1st) + '.parquet'
         pd_distrib.append(pd.read_parquet(filename_distrib))
- 
+        
         if verbose:
            logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename)
  
@@ -588,20 +584,21 @@ class Application:
             devAddr_proc = self.pd_all_flows['devAddr'].drop_duplicates()
           
             logger_preprocflow.info(str(len(devAddr_proc)) + " devAddr already processed and saved in local:")
-            logger_preprocflow.info("\tdevAddr\t\tNb flows")
+            logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
            
             for devAddr in devAddr_proc:
                 list_devAddr_pending.remove(devAddr)
                 
                 if (logger_preprocflow.getEffectiveLevel() >= logging.DEBUG):
                     pd_records = load_distribs_forDevAddr_from_disk(self.pd_all_flows, devAddr, verbose=False)
-                    logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records))  )
+                      
+                    logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
                     logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
 
 
         #get the inter packet times for a given devAddr
         logger_preprocflow.info("> Reading new values in Elastic Search ....")
-        logger_preprocflow.info("\tdevAddr\t\tNb flows")
+        logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
         for devAddr in list_devAddr_pending :
 
             # get the new record(s) for this devAddr (one record per flow)
@@ -615,7 +612,7 @@ class Application:
                     self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
 
                 #logs
-                logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0])  )
+                logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0]) + "\t\t" + str(pd_records["nb_pkts"].sum())  )
                 logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
             else:
                 logger_preprocflow.info("\t" + devAddr + "\t0" )
