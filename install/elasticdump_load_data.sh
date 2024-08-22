@@ -22,7 +22,7 @@ fi
 INDEX_NAME=`cat ../config/myconfig.py | grep "index_name" | cut -d '"' -f 2`
 USER=`cat ../config/myconfig.py | grep "user" | cut -d '"' -f 2`
 PASSWORD=`cat ../config/myconfig.py | grep "password" | cut -d '"' -f 2`
-IP_ADDR=`cat ../config/myconfig.py | grep "ip_server" | cut -d '"' -f 2`
+HOSTNAME=`cat ../config/myconfig.py | grep "hostname" | cut -d '"' -f 2`
 
 #npm verification
 if ! npm -v &> /dev/null
@@ -65,14 +65,14 @@ do
     
     echo "
     NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
---output=https://${USER}:${PASSWORD}@${IP_ADDR}:9200/$INDEX_NAME \
+--output=https://${USER}:${PASSWORD}@${HOSTNAME}:9200/$INDEX_NAME \
 --input=${filename_json} \
 --type=data --limit=10000
        "
 
 
     NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
-            --output=https://${USER}:${PASSWORD}@${IP_ADDR}:9200/$INDEX_NAME \
+            --output=https://${USER}:${PASSWORD}@${HOSTNAME}:9200/$INDEX_NAME \
             --input=${filename_json} \
             --type=data --limit=10000
 
