@@ -49,8 +49,7 @@ logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 QUERY_NB_RESULT = 10000
 DUP_INFO_VERSION = "1.0"
 #NB_LORA_GATEWAYS = 15     # max number of LoRa gateways (and thus, max nb of duplicates)
-OFFSET_MINUTES_MAX = 1    # max offset to search for duplicates (length of the time window), number of minutes
-DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
+OFFSET_MINUTES_MAX = 0.5    # max offset to search for duplicates (length of the time window), number of minutes
 
 
 
@@ -128,9 +127,9 @@ def get_first_time_window():
         #sort them chronologically (just because it's convenient for debuging)
         sort=["mqtt_time"]
     )
-    last_record = datetime.strptime(response['hits']['hits'][0]['_source']['mqtt_time'], DATE_FORMAT_ELASTICSEARCH)
+    last_record = datetime.strptime(response['hits']['hits'][0]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
     next_min = last_record - timedelta(minutes=OFFSET_MINUTES_MAX)
-    mqtt_time_min = datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH)
+    mqtt_time_min = datetime.strftime(next_min, tools.time.DATE_FORMAT_ELASTICSEARCH)
     
     clientES.transport.close()    
     return(mqtt_time_min)
@@ -161,7 +160,8 @@ if __name__ == "__main__":
     
     # Scroll now all the documents of the elastic search index until no remainnig doc to handle
     while True:
-    
+        LOGGER.info("       > " + mqtt_time_min)
+
         # Search and Sort the entries chronologically (MUST include the records already handled
         # Else impossible to detect duplicates between those handled those not handled)
         response = clientES.search(
@@ -182,18 +182,21 @@ if __name__ == "__main__":
         if (length == 0):
             break
         
-        #remember the date of the last entry in the response
-        last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], DATE_FORMAT_ELASTICSEARCH)
+        # remember the date of the last entry in the response
+        # the min is not the smallest mqtt_time if we detect duplicates:
+        # => a frame in the next window may be a duplicate of a frame in the current window if windows do not opverlap
+        # OFFSET_MINUTES_MAX = the max time separating one frame and its duplicate!
+        last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
         next_min = last_record - timedelta(minutes=OFFSET_MINUTES_MAX)
-        LOGGER.debug(mqtt_time_min + " --> " + datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH))
+        LOGGER.debug(mqtt_time_min + " --> " + datetime.strftime(next_min, tools.time.DATE_FORMAT_ELASTICSEARCH))
 
         #bug if the next time is before the previous one (the time window cannot contain all the packets in the same query)
-        if next_min <= datetime.strptime(mqtt_time_min, DATE_FORMAT_ELASTICSEARCH):
+        if next_min <= datetime.strptime(mqtt_time_min, tools.time.DATE_FORMAT_ELASTICSEARCH):
             LOGGER.error("The time window ("+str(OFFSET_MINUTES_MAX)+" minutes) is too large.")
-            LOGGER.error("An ES query cannot contain all the packets generated during tis time window: "+datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH)+" / "+mqtt_time_min)
+            LOGGER.error("An ES query cannot contain all the packets generated during tis time window: "+datetime.strftime(next_min, tools.time.DATE_FORMAT_ELASTICSEARCH)+" / "+mqtt_time_min)
             exit(4)
         else:
-            mqtt_time_min = datetime.strftime(next_min, DATE_FORMAT_ELASTICSEARCH)
+            mqtt_time_min = datetime.strftime(next_min, tools.time.DATE_FORMAT_ELASTICSEARCH)
                 
         # add the is_duplicate field to each entry of this response
         bulk_update = create_updated_entries(response['hits']['hits'])

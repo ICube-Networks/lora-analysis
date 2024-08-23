@@ -151,6 +151,14 @@ def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_values="", key_a
     return(results_df)
 
 
+############################################################
+#           TIME
+############################################################
+
+class time:
+
+    DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
+
 
 
 ############################################################

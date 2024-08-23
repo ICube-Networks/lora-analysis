@@ -89,6 +89,7 @@ if __name__ == "__main__":
 
     # Scroll all the documents of the elastic search index
     datemin="0"
+    LOGGER.info("Start scrolling the records")
     while True:
         #search records without the right extra info version
         response = clientES.options(
@@ -111,14 +112,18 @@ if __name__ == "__main__":
                     {"_score": {"order": "desc"}},
             ]
         )
-        #extracts the mqtt-time of the last element to then scroll later
+
+        # num of records
         length = len(response['hits']['hits'])
         #print("length:", length)
         if (length == 0):
             LOGGER.info("No remaining entry without the right extra_infos field (version=" + EXTRA_INFO_VERSION + ")")
             break
         
-        
+        #extracts the mqtt-time of the last element to then scroll later
+        last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
+        LOGGER.info("       > " + str(last_record))
+
         # reinit the next bulk update query
         bulk_update = []
 

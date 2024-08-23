@@ -440,15 +440,16 @@ def load_from_disk(verbose=False):
     return(pd_all_flows)
     
 
-  
+#save to the disk the main dataframe regrouping all the flow stats (individual distributions per flow are handled separately)
 def save_to_disk(pd_all_flows):
     """ Save to disk the dataframe (with parquet)
         
     :param pd_all_flows: the pandas dataframe
-    4 columns:
+    X columns:
     devAddr: string
     median_interpkt_time: float (seconds)
     nb_pkt: integer
+    etc.
     """
 
     
