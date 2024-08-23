@@ -46,9 +46,7 @@ logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
 # parameters
-QUERY_NB_RESULT = 10000
 DUP_INFO_VERSION = "1.0"
-#NB_LORA_GATEWAYS = 15     # max number of LoRa gateways (and thus, max nb of duplicates)
 OFFSET_MINUTES_MAX = 0.5    # max offset to search for duplicates (length of the time window), number of minutes
 
 
@@ -170,7 +168,7 @@ if __name__ == "__main__":
                 "keep_alive": "10m",
             },
             #index=myconfig.index_name,
-            size=QUERY_NB_RESULT,
+            size=tools.queries.QUERY_NB_RESULT,
             query=tools.queries.QUERY_ALL,
             #sort them chronologically (just because it's convenient for debuging)
             sort=["mqtt_time"],
@@ -208,7 +206,7 @@ if __name__ == "__main__":
             LOGGER.info("No update in this time window (" + mqtt_time_min + "/" + last_record + ")")
         
         #stops if we have less than QUERY_SIZE elements, it was the last response
-        if (length < QUERY_NB_RESULT):
+        if (length < tools.queries.QUERY_NB_RESULT):
             break
 
 

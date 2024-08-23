@@ -65,7 +65,6 @@ DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 
 AGG_OFFSET = 1000                   # offset for the pagination in the aggregatied query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
-QUERY_NB_RESULT = 10000              #  number of results for our elastic search queries
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
 FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file to read/write the data frames
 FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the filenames for the distribution
@@ -206,7 +205,7 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
 
     response = clientES.search(
         index=myconfig.index_name,
-        size=QUERY_NB_RESULT,
+        size=tools.queries.QUERY_NB_RESULT,
         pretty=True,
         human=True,
         query={
@@ -279,7 +278,7 @@ def eq_query_get_interpkt(devAddr):
     
         #tx the elastic search query to the server
         response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
-        logger_preprocflow.debug("New Elastic Search query (" + str(QUERY_NB_RESULT) + " records at most)")
+        logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
         
         #no remaining response
         length = len(response["hits"]["hits"])
@@ -371,7 +370,7 @@ def eq_query_get_interpkt(devAddr):
 
     
         #stops if we have less than QUERY_SIZE elements, it was the last response
-        if (length < QUERY_NB_RESULT):
+        if (length < tools.queries.QUERY_NB_RESULT):
             break
 
    

@@ -55,7 +55,6 @@ logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
 #parameters
-QUERY_NB_RESULT = 1000
 EXTRA_INFO_VERSION = "1.0"
 
 
@@ -96,7 +95,7 @@ if __name__ == "__main__":
             basic_auth=(myconfig.user, myconfig.password),
         ).search(
             index=myconfig.index_name,
-            size=QUERY_NB_RESULT,
+            size=tools.queries.QUERY_NB_RESULT,
             query={
                 "bool": {
                     "must_not": {
@@ -170,7 +169,7 @@ if __name__ == "__main__":
                 
             
         #stops if we have less than QUERY_SIZE elements, it was the last response
-        if (length < QUERY_NB_RESULT):
+        if (length < tools.queries.QUERY_NB_RESULT):
             LOGGER.info("No remaining entry without the right extra_infos field (version=" + EXTRA_INFO_VERSION + ")")
             LOGGER.info("Last bulk contained " + str(length) + " entries")
             break
