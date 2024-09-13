@@ -499,7 +499,9 @@ def load_distribs_forDevAddr_and_time_1st_from_disk(devAddr, time_1st, verbose=F
     
     """
      
-    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(time_1st) + '.parquet'
+    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(time_1st).replace(":", "-").replace("/", "_") + '.parquet'
+    print(filename_distrib)
+    exit(0)
     pd_distrib = pd.read_parquet(filename_distrib)
     logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename_distrib)
     
