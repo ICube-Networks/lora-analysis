@@ -142,7 +142,7 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
     
     
 
-def plot_interpkt_time_distribution_unique(pd_all_flows):
+def plot_interpkt_ecdf(values, figname, xlabel):
     """ Plot a distribution (pd dataframe) with an ECDF
         
     :param distribution: a pandas dataframe with the data to plot
@@ -153,26 +153,29 @@ def plot_interpkt_time_distribution_unique(pd_all_flows):
     sns.set(font_scale=1)
       
     g = sns.ecdfplot(
-        pd_all_flows,
+            values,
         log_scale=True
     )
-    g.set(xlabel='Inter pkt time', ylabel='Proportion')
+    g.set(xlabel=xlabel, ylabel='Proportion')
     
     # remove values under 1s from the x-coordinates
-    g.set(xlim=(1, pd_all_flows.max()))
+    g.set(xlim=(values.min(), values.max()))
     
     #label with the typical units of time
-    values = [1, 60, 3600, 86400, 604800, 2419200]
-    labels = ["1s", "1min", "1h", "1d", "1w", "1m" ]
-    g.set_xticks(values, labels=labels)
+    xvalues = [60, 3600, 86400, 604800, 2419200]
+    labels = ["1min", "1h", "1d", "1w", "1m" ]
+    g.set_xticks(xvalues, labels=labels)
     
     
     #save figure
     plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
-    g.figure.savefig("figures/interpkt_time_distribution_median.pdf")
+    g.figure.savefig(figname)
     g.figure.clf()
          
      
+    
+    
+    
      
 def plot_interpkt_nbpkts(pd_all_flows):
     """ Plot the interpacket time vs. the number of packets of the flow
@@ -266,6 +269,7 @@ if __name__ == "__main__":
     
     #filtering
     pd_all_flows = pd_all_flows[(pd_all_flows.nb_pkts >= NB_PKTS_MIN)]
+ 
 
     # --- plots ---
     # plot a grid of distributions (invidividual analysis)
@@ -278,12 +282,23 @@ if __name__ == "__main__":
     logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
 
     # plot the EDCF of the median inter packet time (remove samples with not enough packets)
-    plot_interpkt_time_distribution_unique(pd_all_flows['median_interpkt_time'])
+    plot_interpkt_ecdf(
+        values=pd_all_flows['median_interpkt_time'],
+        figname="figures/flow_distribution_interpkttime.pdf",
+        xlabel='Inter pkt time'
+    )
+    
+    # EDCF of the flow duration
+    plot_interpkt_ecdf(
+        values=(pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds(),
+        figname="figures/flow_distribution_duration.pdf",
+        xlabel="Flow duration"
+    )
+
 
     #PB: certaines courbes avec 4 PJTS ??? normalement pas possilble car filtrage sur >= NB_PKTS_MIN
 
     #correlation inter pkt time / nb packets
     plot_interpkt_nbpkts(pd_all_flows)
 
-    
 #0f9aa96f : distribution en escalier
