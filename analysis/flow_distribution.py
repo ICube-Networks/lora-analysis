@@ -60,8 +60,8 @@ import extract_interpacket_distribution
 
 
 #parameters
-NB_PKTS_MIN = 25        # minimum number of packets for a given devAddr (else discarded) to compute the median value
-NB_PLOTS = 25           # number of plots for individual distributions
+NB_PKTS_MIN = 9        # minimum number of packets for a given devAddr (else discarded) to compute the median value
+NB_PLOTS = 9           # number of plots for individual distributions
 INTERPKTIME_MAX = 10**4 # maxium interpacket time considered when plotting the correlation nbpkts / inter packet time
 
 

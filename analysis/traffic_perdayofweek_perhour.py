@@ -130,17 +130,21 @@ def plot_traffic_per_dayofweek(clientES):
     print(results_df)
 
     # Create a seaborn visualization
-    sns.set()
-    sns.set_theme()
+    sns.set(font_scale=2.0)
     g = sns.relplot(
         data=results_df,
         kind="line",
         x="day_of_week", y="count",
+        aspect=11/5,
+        label='big'
         #palette="tab10",
     )
-    g.set(xlabel='Day of the week', ylabel='Number of packets per day')
-    g.set(ylim=(0, None))
+    g.set_xlabels('Day of the week')
+    g.set_ylabels('Number of packets per day')
+    g.set(ylim=(40000, None))
+    
     g.set_xticklabels(tools.dayofweek.short[:len(tools.dayofweek.short)])
+    g.tight_layout()
     fig = g.figure.savefig("figures/traffic_per_dayofweek.pdf")
     
 
@@ -218,17 +222,19 @@ def plot_traffic_per_hour(clientES):
     print(results_df)
 
     # Create a seaborn visualization
-    sns.set()
-    sns.set_theme()
+    sns.set(font_scale=2.0)
     g = sns.relplot(
         data=results_df,
         kind="line",
         x="hour", y="count",
-        palette="tab10",
+        aspect=11/5
+        #palette="tab10",
         #hue="event", style="event",
     )
-    g.set(xlabel='Hour of the day', ylabel='Number of packets per hour')
-    g.set(ylim=(0, None))
+    g.set_xlabels('Hour of the day');
+    g.set_ylabels('Number of packets per hour');
+    #g.set(ylim=(0, None))
+    g.tight_layout()
     fig = g.figure.savefig("figures/traffic_per_hour.pdf")
 
  
