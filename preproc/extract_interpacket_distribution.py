@@ -70,9 +70,9 @@ FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file t
 FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the filenames for the distribution
 
 # conditions for a new flow
-DELTA_FCNT_ABS_MAX = 30              # absolute diff: if the counter diff exceeds DELTA
-DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # if the inter-packet time exceeds 1 day (epoch in ms)
-DELTA_INTERPKT_REL_TIME_MAX = 3      # if the inter-packet time exceeds DELTA * max
+DELTA_FCNT_ABS_MAX = 100              # absolute diff: if the counter diff exceeds DELTA
+DELTA_INTERPKT_ABS_TIME_MAX = 60480000000  # if the inter-packet time exceeds 1 day (epoch in ms), 7 days
+#DELTA_INTERPKT_REL_TIME_MAX = 3      # if the inter-packet time exceeds DELTA * max
 
 #
 
@@ -271,7 +271,6 @@ def eq_query_get_interpkt(devAddr):
      
     #list of flows for this devAddr: empty (we will add a flow when we detect a new one)
     flows_for_thisDevAddr = []
-    test = 0
     
     #for all the packets generated with this devAddr
     while True:
@@ -317,8 +316,9 @@ def eq_query_get_interpkt(devAddr):
                         # update the current fcnt value for this flow (this is my new reference for this flow)
                         flow['fCnt_last'] = max(flow['fCnt_last'], fCnt_current)
                         flow['epochtime_last'] = time_current
-                        flow['interpkttime_max'] = max(flow['interpkttime_max'], time_difference * DELTA_INTERPKT_REL_TIME_MAX)
                         flow['time_last'] = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
+                        # update the interpacket time max for this flow (current value or current time_diff * DELTA_MAX)
+                        #flow['interpkttime_max'] = max(flow['interpkttime_max'], time_difference * DELTA_INTERPKT_REL_TIME_MAX)
 
                         # create a pandas record at the end of the distrib
                         flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
@@ -327,10 +327,7 @@ def eq_query_get_interpkt(devAddr):
                             fCnt_current,
                             datetime.strptime(current_packet_data["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
                             current_packet_data["fields"]["phyPayload"][0],
-                            test,
                         ]
-                        test = test +1
-                   
 
                         #if test > 200:
                         #    exit(2)
@@ -347,9 +344,7 @@ def eq_query_get_interpkt(devAddr):
                     'fCnt' : [fCnt_current],
                     'mqtt_time' : [datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)],
                     'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
-                    'test': [test],
                 }
-                test = test + 1
                 
                 # a new flow is created
                 flows_for_thisDevAddr.append({
@@ -373,7 +368,15 @@ def eq_query_get_interpkt(devAddr):
         if (length < tools.queries.QUERY_NB_RESULT):
             break
 
-   
+    #print(pd_these_flows)
+    print("----------")
+    #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+    #    print(flows_for_thisDevAddr[0]['pd_distrib'])
+
+    print("----------")
+
+    print(flows_for_thisDevAddr[1]['pd_distrib'])
+
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
 
@@ -393,6 +396,8 @@ def eq_query_get_interpkt(devAddr):
             pd_these_flows = pd.DataFrame(data=record_summary)
         else:
             pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record_summary)], ignore_index=True)
+            
+    print(pd_these_flows)
 
 
     if 'pd_these_flows' not in locals():
@@ -623,6 +628,9 @@ class Application:
             if self.terminated:
                 print("------- Application interrupted ----- ")
                 break
+                
+            #debug
+            break
       
       
       
