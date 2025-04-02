@@ -49,7 +49,9 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
-
+#profiling
+import cProfile
+    
 # parameters
 DUP_INFO_VERSION = "1.0"
 OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the time window), number of minutes
@@ -193,6 +195,7 @@ def get_smallest_phyPayload_mqtt_time():
 ############################################################
 
 
+
 # executable
 if __name__ == "__main__":
     """
@@ -296,9 +299,13 @@ if __name__ == "__main__":
 
         
 
-clientES.close_point_in_time(id=pit_id)
-clientES.transport.close()
-exit(0)
+    clientES.close_point_in_time(id=pit_id)
+    clientES.transport.close()
+
+
+
+ 
+    exit(0)
   
     
     
