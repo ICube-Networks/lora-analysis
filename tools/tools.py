@@ -160,6 +160,22 @@ class time:
     DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 
 
+    def fixMicroseconds(timestamp):
+        """
+        The microseconds field must be zero padded if required
+        Format: 2020-10-05T19:08:35.251262Z
+        
+        """
+        parts = timestamp.split('.')
+        last_parts = parts[-1].split('Z')
+
+        # replace the last elemen with padded zeros, and append the 'Z'
+        return '.'.join(
+            parts[:-1] + ['{:06d}'.format(int(last_parts[0]))]
+        )+'Z'
+   
+   
+
 
 ############################################################
 #           Generic Queries (body of ES)

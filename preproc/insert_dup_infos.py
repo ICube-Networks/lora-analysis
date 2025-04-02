@@ -61,21 +61,6 @@ OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the 
 ############################################################
 
 
-def fixMicroseconds(timestamp):
-    """
-    The microseconds field must be zero padded if required
-    Format: 2020-10-05T19:08:35.251262Z
-    
-    """
-    parts = timestamp.split('.')
-    last_parts = parts[-1].split('Z')
-
-    # replace the last elemen with padded zeros, and append the 'Z'
-    return '.'.join(
-        parts[:-1] + ['{:06d}'.format(int(last_parts[0]))]
-    )+'Z'
-   
-   
    
 def create_updated_entries(response):
     """
@@ -86,6 +71,12 @@ def create_updated_entries(response):
     bulk_update = []
     
     #print(response)
+    
+    # critical error if a phyPayload wraps several queries
+    if response[0]['_source']['phyPayload'] == response[len(response)-1]['_source']['phyPayload']:
+        LOGGER.critical("We have the same phyPayload at the beginning and end of the query")
+        LOGGER.critical("We may miss some duplicates -> let's top here")
+        exit(4)
     
     
     found = False   # used only for index=1, else, it is handled in the tests
@@ -99,7 +90,7 @@ def create_updated_entries(response):
             
                 # compute the time difference between this record and the previous one
                 try:
-                    diff_time = datetime.strptime(fixMicroseconds(response[index]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(fixMicroseconds(response[index-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
+                    diff_time = datetime.strptime(tools.time.fixMicroseconds(response[index]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(tools.time.fixMicroseconds(response[index-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
                     
                 except Exception as e :
                     LOGGER.critical("An error occured when parsing the response -> "+ str(e))
@@ -145,7 +136,7 @@ def create_updated_entries(response):
 
 
 
-def get_first_phyPayload():
+def get_first_mqttTime_phyPayload():
     """
     Returns the smallest (alphabetically) phyPayload in the dataset that has no du_info field
     We do not make a distinction between records with and without dupinfo field
@@ -155,10 +146,8 @@ def get_first_phyPayload():
     clientES = tools.elasticsearch_open_connection()
  
     response = clientES.search(
-        pit={
-            "id": pit_id,
-            "keep_alive": "10m",
-        },
+        index=myconfig.index_name,
+        size=1,
         query={
             "bool": {
                 "must_not" : [{
@@ -170,9 +159,12 @@ def get_first_phyPayload():
                 }]
             }
         },
-        size=1,
-        #sort them chronologically (just because it's convenient for debuging)
-        sort=["phyPayload.keyword"]
+        fields=[
+            "phyPayload",
+            "mqtt_time",
+        ],
+        #sort them chronologically and then by payload
+        sort=["mqtt_time", "phyPayload.keyword"]
     )
     
     clientES.transport.close()
@@ -181,7 +173,7 @@ def get_first_phyPayload():
     if response['hits']['total']['value'] == 0:
         return(None, None)
     
-    return(response['hits']['hits'][0]['_source']['phyPayload'], response['hits']['hits'][0]['_source']['mqtt_time'])
+    return(response['hits']['hits'][0]['_source']['mqtt_time'], response['hits']['hits'][0]['_source']['phyPayload'])
 
 
 
@@ -202,19 +194,24 @@ if __name__ == "__main__":
     clientES = tools.elasticsearch_open_connection()
     pit_id = tools.elasticsearch_create_pit(clientES)
     
-    
-    # retrieve the earliest entry not handled
-    phyPayload_min, mqtt_time_min = get_first_phyPayload()
-    if phyPayload_min is None:
-        LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
-        exit(0)
-    
-    #LOGGER.info("Start scrolling the records from the payload " + phyPayload_min + " with mqtt_time " + mqtt_time_min)
-    
-    
-    # Scroll now all the documents of the elastic search index until no remainnig doc to handle
+        
+    # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
     while True:
-        LOGGER.info("\t> phyPayload_min=" + phyPayload_min)
+        # retrieve the earliest entry not handled
+        # if we just use the next payload from the prev query, we cannot "skip" the packets already processed
+        # payload will change, the mqtt_time cannot (different payloads may overlap in time)
+        mqtt_time_min, phyPayload_min = get_first_mqttTime_phyPayload()
+
+        # no frame to be processed: all of them have a dup_infos field with the right version number
+        if phyPayload_min is None:
+            LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
+            exit(0)
+        
+        # to detect all the duplicates, shift the mqtt_time_min in the past!
+        mqtt_time_min = (datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
+        
+        #info
+        LOGGER.info("\t> phyPayload_min=" + phyPayload_min + " mqtt_time_min=" + mqtt_time_min)
 
         # Search and Sort the entries chronologically (MUST include the records already handled
         # Else impossible to detect duplicates between those handled and those not handled)
@@ -222,15 +219,22 @@ if __name__ == "__main__":
             index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
             query={
-            "bool": {
-                "must" : [{
-                    "range": {
-                        "phyPayload.keyword": {
-                            "gte": phyPayload_min
+                "bool": {
+                    "must" : [{
+                        "range": {
+                            "phyPayload.keyword": {
+                                "gte": phyPayload_min
+                            }
                         }
-                    }
-                }]
-            }
+                    },
+                    {
+                         "range": {
+                            "mqtt_time": {
+                                "gte": mqtt_time_min
+                            }
+                        }
+                    }]
+                }
             },
             pretty=True,
             human=True,
@@ -242,7 +246,6 @@ if __name__ == "__main__":
         length = len(response['hits']['hits'])
         if (length == 0):
             break
-            
          
         # add the is_duplicate field to each entry of this response
         bulk_update = create_updated_entries(response['hits']['hits'])
@@ -257,9 +260,7 @@ if __name__ == "__main__":
             LOGGER.info("\t... pushed")
         else:
             LOGGER.info("\tNo update in this window (" + phyPayload_min + "/" + phyPayload_last + ")")
-          
-        phyPayload_min = phyPayload_last
-          
+                 
           
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
