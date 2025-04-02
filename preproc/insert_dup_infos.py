@@ -205,8 +205,7 @@ if __name__ == "__main__":
 
     #connections
     clientES = tools.elasticsearch_open_connection()
-    pit_id = tools.elasticsearch_create_pit(clientES)
-    
+  
         
     # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
     while True:
@@ -245,7 +244,8 @@ if __name__ == "__main__":
         
         # if all the results own to the same payload, split the query with its mqtt_time
         if len(response) == tools.queries.QUERY_NB_RESULT and response[0]['_source']['phyPayload'] == response[len(response)-1]['_source']['phyPayload']:
-        
+            
+
             # to detect all the duplicates, shift the mqtt_time_min in the past!
             min_value['mqtt_time'] = (datetime.strptime(tools.time.fixMicroseconds(min_value['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
          
@@ -298,13 +298,7 @@ if __name__ == "__main__":
 
 
         
-
-    clientES.close_point_in_time(id=pit_id)
     clientES.transport.close()
-
-
-
- 
     exit(0)
   
     

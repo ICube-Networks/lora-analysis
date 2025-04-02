@@ -20,6 +20,7 @@
 	    }
 	  }
 	 }
+	 
  
  
  Be careful: limit the nb of docs to delete simultaneously (15 days = 15,000 docs are ok)

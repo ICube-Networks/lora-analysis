@@ -412,7 +412,7 @@ def elasticsearch_push_updates(bulk_update):
 
    
     #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-    for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=1000, thread_count=4):
+    for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=5000, thread_count=4):
         action, result = result.popitem()
         
         logger_tool.debug("action: ", action)
