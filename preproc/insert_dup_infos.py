@@ -184,48 +184,6 @@ def get_smallest_phyPayload_mqtt_time():
     return(min_value)
 
 
-def get_smallest_mqtt_time_phyPayload():
-    """
-    Returns the earliest  + smallest (alphabetically) phyPayload in the dataset that has no du_info field
- 
-    """
-    
-    clientES = tools.elasticsearch_open_connection()
- 
-    response = clientES.search(
-        index=myconfig.index_name,
-        size=1,
-        query={
-            "bool": {
-                "must_not" : [{
-                    "range": {
-                        "dup_infos.version": {
-                            "gte": DUP_INFO_VERSION
-                        }
-                    }
-                }]
-            }
-        },
-        fields=[
-            "mqtt_time",
-            "phyPayload",
-        ],
-        #sort payload and chronologically (smallest non processed time of the smallest payload)
-        sort=["phyPayload.keyword", "mqtt_time"]
-    )
-    
-    clientES.transport.close()
-
-    # no response!
-    if response['hits']['total']['value'] == 0:
-        return(None, None)
-    
-    
-    min_value = {}
-    min_value['phyPayload'] = response['hits']['hits'][0]['_source']['phyPayload']
-    min_value['mqtt_time'] = response['hits']['hits'][0]['_source']['mqtt_time']
-    return(min_value)
-
 
 
 
@@ -250,18 +208,15 @@ if __name__ == "__main__":
     # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
     while True:
         # retrieve the earliest entry not handled,
-        min_value = get_smallest_mqtt_time_phyPayload()
+        min_value = get_smallest_phyPayload_mqtt_time()
 
         # no frame to be processed: all of them have a dup_infos field with the right version number
         if min_value['phyPayload'] is None:
             LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
             exit(0)
-        
-        # to detect all the duplicates, shift the mqtt_time_min in the past!
-        min_value['mqtt_time'] = (datetime.strptime(tools.time.fixMicroseconds(min_value['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
-        
+       
         #info
-        LOGGER.info("\t> phyPayload=" + min_value['phyPayload'] + " mqtt_time_min=" + min_value['mqtt_time'])
+        LOGGER.info("\t> phyPayload_min=" + min_value['phyPayload'])
 
         # Search and Sort the entries chronologically (MUST include the records already handled
         # Else impossible to detect duplicates between those handled and those not handled)
@@ -276,13 +231,6 @@ if __name__ == "__main__":
                                 "gte": min_value['phyPayload']
                             }
                         }
-                    },
-                    {
-                        "range": {
-                            "mqtt_time": {
-                                "gte": min_value['mqtt_time']
-                            }
-                        }
                     }]
                 }
             },
@@ -295,12 +243,11 @@ if __name__ == "__main__":
         # if all the results own to the same payload, split the query with its mqtt_time
         if len(response) == tools.queries.QUERY_NB_RESULT and response[0]['_source']['phyPayload'] == response[len(response)-1]['_source']['phyPayload']:
         
-            #get the min mqtt_time for THIS payload uniquely
-            min_value = get_smallest_phyPayload_mqtt_time()
-       
             # to detect all the duplicates, shift the mqtt_time_min in the past!
             min_value['mqtt_time'] = (datetime.strptime(tools.time.fixMicroseconds(min_value['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
- 
+         
+            LOGGER.info("\t> too many, focus on phyPayload=" + min_value['phyPayload'] + " mqtt_time_min=" + min_value['mqtt_time'])
+
             #all the fields for THIS payload, ranked by the mqtt_time
             response = clientES.search(
                 index=myconfig.index_name,
