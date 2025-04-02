@@ -51,7 +51,7 @@ logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
 # parameters
-DUP_INFO_VERSION = "1.0"
+DUP_INFO_VERSION = "1.1"
 OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the time window), number of minutes
 
 
@@ -70,8 +70,58 @@ def create_updated_entries(response):
     # initialize the next bulk update query
     bulk_update = []
     
-    # empty dataframe
-    list_processed = pd.DataFrame(columns=('phyPayload', 'spreadingFactor', 'bandwidth', 'codeRate', 'frequency', 'mqtt_time', 'id'))
+    #print(response)
+    
+    
+    found = False   # used only for index=1, else, it is handled in the tests
+    previous_id = 0
+    for index in range(len(response)):
+        
+    
+        if index >= 1:
+            
+            # Same info (NB: the recorded are sorted by <phyPayload, mqtt_time>
+            # Thus duplicates are contiguous
+            if (response[index-1]['_source']['phyPayload'] == response[index]['_source']['phyPayload']) and  (response[index-1]['_source']['txInfo']['loRaModulationInfo']['spreadingFactor'] == response[index]['_source']['txInfo']['loRaModulationInfo']['spreadingFactor']) and (response[index-1]['_source']['txInfo']['loRaModulationInfo']['bandwidth'] == response[index]['_source']['txInfo']['loRaModulationInfo']['bandwidth']) and (response[index-1]['_source']['txInfo']['loRaModulationInfo']['codeRate'] == response[index]['_source']['txInfo']['loRaModulationInfo']['codeRate']) and (response[index-1]['_source']['txInfo']['frequency'] == response[index]['_source']['txInfo']['frequency']):
+            
+                
+                diff_time = datetime.strptime(response[index]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(response[index-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
+            
+                if (diff_time <= timedelta(minutes = OFFSET_MINUTES_MAX)):
+                    found = True
+                else:
+                    found = False
+            else:
+                found = False
+
+        # info on duplicates
+        dup_infos = {}
+        dup_infos['version']        = DUP_INFO_VERSION
+        dup_infos['is_duplicate']   = found
+        if (index == 0 or found is False) :
+            dup_infos['copy_of']                = response[index]['_id']
+        else:
+            dup_infos['copy_of']                = previous_id
+        previous_id = dup_infos['copy_of']
+        
+        
+        #construct the nex update for this id
+        req_update = {}
+        req_update = response[index]['_source']
+        req_update['_index']       = myconfig.index_name
+        req_update['_id']          = response[index]['_id']
+        req_update['dup_infos']    = dup_infos
+        LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+        
+        # insert this update to the current sequence
+        bulk_update.append(req_update)
+    
+    return(bulk_update)
+
+        
+ #--------------------------------------
+    
+    
     
     #a duplicate must have the same payload + PHY info
     for record in response:
@@ -119,7 +169,7 @@ def create_updated_entries(response):
 
         # has this record already dup_infos with the right info?
         try:
-            assert(record['_source']['dup_infos']['version'] == DUP_INFO_VERSION)       # dup information version
+            assert(record['_source']['dup_infos']['version'] >= DUP_INFO_VERSION)       # dup information version
             assert(record['_source']['dup_infos']['is_duplicate'] == is_duplicate)      # the duplicate was correctly classified
             
             #logger.DEBUG("--> ok (is_duplicate) (id = " + record['_id'] + ")")
@@ -142,8 +192,6 @@ def create_updated_entries(response):
             # insert this update to the current sequence
             bulk_update.append(req_update)
     
-
-    
     return(bulk_update)
 
 
@@ -164,11 +212,9 @@ def get_first_phyPayload():
             "keep_alive": "10m",
         },
         query={
-            "bool": {
-                "must_not": {
-                    "term" :{
-                        "dup_infos.version": DUP_INFO_VERSION
-                    }
+            "range": {
+                "dup_infos.version": {
+                    "gte": DUP_INFO_VERSION
                 }
             }
         },
