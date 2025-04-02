@@ -51,7 +51,7 @@ logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
 # parameters
-DUP_INFO_VERSION = "1.1"
+DUP_INFO_VERSION = "1.0"
 OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the time window), number of minutes
 
 
@@ -61,7 +61,22 @@ OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the 
 ############################################################
 
 
+def fixMicroseconds(timestamp):
+    """
+    The microseconds field must be zero padded if required
+    Format: 2020-10-05T19:08:35.251262Z
+    
+    """
+    parts = timestamp.split('.')
+    last_parts = parts[-1].split('Z')
 
+    # replace the last elemen with padded zeros, and append the 'Z'
+    return '.'.join(
+        parts[:-1] + ['{:06d}'.format(int(last_parts[0]))]
+    )+'Z'
+   
+   
+   
 def create_updated_entries(response):
     """
     Search if the same phyPayload exists to mark other packets as duplicates
@@ -76,21 +91,29 @@ def create_updated_entries(response):
     found = False   # used only for index=1, else, it is handled in the tests
     previous_id = 0
     for index in range(len(response)):
-        
     
         if index >= 1:
-            
             # Same info (NB: the recorded are sorted by <phyPayload, mqtt_time>
             # Thus duplicates are contiguous
             if (response[index-1]['_source']['phyPayload'] == response[index]['_source']['phyPayload']) and  (response[index-1]['_source']['txInfo']['loRaModulationInfo']['spreadingFactor'] == response[index]['_source']['txInfo']['loRaModulationInfo']['spreadingFactor']) and (response[index-1]['_source']['txInfo']['loRaModulationInfo']['bandwidth'] == response[index]['_source']['txInfo']['loRaModulationInfo']['bandwidth']) and (response[index-1]['_source']['txInfo']['loRaModulationInfo']['codeRate'] == response[index]['_source']['txInfo']['loRaModulationInfo']['codeRate']) and (response[index-1]['_source']['txInfo']['frequency'] == response[index]['_source']['txInfo']['frequency']):
             
-                
-                diff_time = datetime.strptime(response[index]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(response[index-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
-            
+                # compute the time difference between this record and the previous one
+                try:
+                    diff_time = datetime.strptime(fixMicroseconds(response[index]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(fixMicroseconds(response[index-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
+                    
+                except Exception as e :
+                    LOGGER.critical("An error occured when parsing the response -> "+ str(e))
+                    LOGGER.critical("response:")
+                    LOGGER.critical(json.dumps(response, sort_keys=True, indent=4))
+                    LOGGER.critical("index: " + str(index) + " id="+ response[index]['_id'])
+                    exit(7)
+
+                # this is a duplicate only if time diff acceptable + same PHY info
                 if (diff_time <= timedelta(minutes = OFFSET_MINUTES_MAX)):
                     found = True
                 else:
                     found = False
+            # PHY info differ -> not a duplicate
             else:
                 found = False
 
@@ -112,85 +135,10 @@ def create_updated_entries(response):
         req_update['_id']          = response[index]['_id']
         req_update['dup_infos']    = dup_infos
         LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+        LOGGER.debug(req_update['_id'])
         
         # insert this update to the current sequence
         bulk_update.append(req_update)
-    
-    return(bulk_update)
-
-        
- #--------------------------------------
-    
-    
-    
-    #a duplicate must have the same payload + PHY info
-    for record in response:
-    
-        found = False
-        record_keys = {
-                 'phyPayload'       : record['_source']['phyPayload'] ,
-                 'spreadingFactor'  : record['_source']['txInfo']['loRaModulationInfo']['spreadingFactor'],
-                 'bandwidth'        : record['_source']['txInfo']['loRaModulationInfo']['bandwidth'],
-                 'codeRate'         : record['_source']['txInfo']['loRaModulationInfo']['codeRate'],
-                 'frequency'        : record['_source']['txInfo']['frequency'],
-                 'mqtt_time'        : datetime.strptime(record['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH),
-                 'id'               : record['_id'],
-            }
-
-
-        # list the records already processed with the same info (phyPayload + PHY info)
-        possible_dups = list_processed.query('phyPayload=="'+record_keys['phyPayload']+'" & spreadingFactor=='+str(record_keys['spreadingFactor'])+' & bandwidth=='+str(record_keys['bandwidth'])+' & codeRate=="'+str(record_keys['codeRate'])+'" & frequency=='+str(record_keys['frequency']))
-
-        # and search for an acceptable time difference
-        for index, row in  possible_dups.iterrows():
-            #print(row)
-
-            diff_time = record_keys['mqtt_time'] - row['mqtt_time']
-            if (diff_time <= timedelta(minutes = OFFSET_MINUTES_MAX)):
-                found = True
-                is_duplicate = True
-                original_id = row['id']
-                
-                break
-
-        # Nothing found -> it's not a duplicate
-        if found is False:
-            
-            # add to the dataframe
-            if list_processed.empty:
-                list_processed =  pd.DataFrame.from_records([record_keys])
-            else :
-                list_processed = pd.concat([list_processed, pd.DataFrame.from_records([record_keys])])
-
-            #list_processed.append(record_keys)
-            is_duplicate = False
-            original_id = record['_id']
-
-
-        # has this record already dup_infos with the right info?
-        try:
-            assert(record['_source']['dup_infos']['version'] >= DUP_INFO_VERSION)       # dup information version
-            assert(record['_source']['dup_infos']['is_duplicate'] == is_duplicate)      # the duplicate was correctly classified
-            
-            #logger.DEBUG("--> ok (is_duplicate) (id = " + record['_id'] + ")")
-
-        except (KeyError, AssertionError) as e:
-
-            # info on duplicates
-            dup_infos = {}
-            dup_infos['version'] = DUP_INFO_VERSION
-            dup_infos['is_duplicate'] = is_duplicate
-            dup_infos['orig'] = original_id
-
-            #construct the nex update for this id (decoding the LoRa frame)
-            req_update = record['_source']
-            req_update['_index']       = myconfig.index_name
-            req_update['_id']          = record['_id']
-            req_update['dup_infos']    = dup_infos
-            LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
-              
-            # insert this update to the current sequence
-            bulk_update.append(req_update)
     
     return(bulk_update)
 
@@ -261,7 +209,7 @@ if __name__ == "__main__":
         LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
         exit(0)
     
-    LOGGER.info("Start scrolling the records from the payload " + phyPayload_min + " with mqtt_time " + mqtt_time_min)
+    #LOGGER.info("Start scrolling the records from the payload " + phyPayload_min + " with mqtt_time " + mqtt_time_min)
     
     
     # Scroll now all the documents of the elastic search index until no remainnig doc to handle
@@ -269,18 +217,25 @@ if __name__ == "__main__":
         LOGGER.info("\t> phyPayload_min=" + phyPayload_min)
 
         # Search and Sort the entries chronologically (MUST include the records already handled
-        # Else impossible to detect duplicates between those handled those not handled)
+        # Else impossible to detect duplicates between those handled and those not handled)
         response = clientES.search(
-            pit={
-                "id": pit_id,
-                "keep_alive": "10m",
-            },
-            #index=myconfig.index_name,
+            index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
-            query=tools.queries.QUERY_ALL,
+            query={
+            "bool": {
+                "must" : [{
+                    "range": {
+                        "phyPayload.keyword": {
+                            "gte": phyPayload_min
+                        }
+                    }
+                }]
+            }
+            },
+            pretty=True,
+            human=True,
             #sort them by payload and chronologically
             sort=["phyPayload.keyword", "mqtt_time"],
-            search_after=[phyPayload_min, mqtt_time_min],       # NB: the mqtt min is never updated. We juse use the phypayload
         )
         
         #no remaining response
@@ -297,7 +252,7 @@ if __name__ == "__main__":
         
         #push the update
         if len(bulk_update) > 0:
-            LOGGER.info("\tPush the update to the server")
+            LOGGER.info("\tPush the update to the server ("+ str(len(bulk_update))+" records)")
             tools.elasticsearch_push_updates(bulk_update)
             LOGGER.info("\t... pushed")
         else:
@@ -309,6 +264,8 @@ if __name__ == "__main__":
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
             break
+            
+
 
         
 
