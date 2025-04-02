@@ -212,10 +212,14 @@ def get_first_phyPayload():
             "keep_alive": "10m",
         },
         query={
-            "range": {
-                "dup_infos.version": {
-                    "gte": DUP_INFO_VERSION
-                }
+            "bool": {
+                "must_not" : [{
+                    "range": {
+                        "dup_infos.version": {
+                            "gte": DUP_INFO_VERSION
+                        }
+                    }
+                }]
             }
         },
         size=1,
@@ -224,6 +228,11 @@ def get_first_phyPayload():
     )
     
     clientES.transport.close()
+
+    # no response!
+    if response['hits']['total']['value'] == 0:
+        return(None, None)
+    
     return(response['hits']['hits'][0]['_source']['phyPayload'], response['hits']['hits'][0]['_source']['mqtt_time'])
 
 
@@ -248,6 +257,10 @@ if __name__ == "__main__":
     
     # retrieve the earliest entry not handled
     phyPayload_min, mqtt_time_min = get_first_phyPayload()
+    if phyPayload_min is None:
+        LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
+        exit(0)
+    
     LOGGER.info("Start scrolling the records from the payload " + phyPayload_min + " with mqtt_time " + mqtt_time_min)
     
     
