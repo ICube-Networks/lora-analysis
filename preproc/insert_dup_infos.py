@@ -202,7 +202,7 @@ if __name__ == "__main__":
     Executes the script to pinsert duplicate info in the elastic search dataset
  
     """
-
+    
     #connections
     clientES = tools.elasticsearch_open_connection()
   

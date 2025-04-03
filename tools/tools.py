@@ -157,17 +157,31 @@ def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_values="", key_a
 
 class time:
 
-    DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
+    DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date in the elastic search dataset (mqtt time)
+    DATE_FORMAT_FILENAME = "%Y-%m-%d_%H.%M.%S.%f"     # format of the date for filenames
 
 
     def fixMicroseconds(timestamp):
         """
-        The microseconds field must be zero padded if required
-        Format: 2020-10-05T19:08:35.251262Z
+        Padd the microseconds field with zeros
+        
+        Format (the microsecond field may be absent): 
+        2020-10-05T19:08:35Z
+        2020-10-05T19:08:35.262Z
+        2020-10-05T19:08:35.251262Z
         
         """
         parts = timestamp.split('.')
-        last_parts = parts[-1].split('Z')
+        # usual case: 2020-10-05T19:08:35.251262Z
+        if len(parts) == 2:
+            last_parts = parts[-1].split('Z')
+ 
+        #no microsecond: 2021-02-01T02:11:40Z
+        else:
+            parts = timestamp.split('Z')
+            last_parts = ["0"]
+
+    
 
         # replace the last elemen with padded zeros, and append the 'Z'
         return '.'.join(

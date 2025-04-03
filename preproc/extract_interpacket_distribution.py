@@ -316,7 +316,7 @@ def eq_query_get_interpkt(devAddr):
                         # update the current fcnt value for this flow (this is my new reference for this flow)
                         flow['fCnt_last'] = max(flow['fCnt_last'], fCnt_current)
                         flow['epochtime_last'] = time_current
-                        flow['time_last'] = datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)
+                        flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
                         # update the interpacket time max for this flow (current value or current time_diff * DELTA_MAX)
                         #flow['interpkttime_max'] = max(flow['interpkttime_max'], time_difference * DELTA_INTERPKT_REL_TIME_MAX)
 
@@ -325,7 +325,7 @@ def eq_query_get_interpkt(devAddr):
                             time_difference,
                             fCnt_difference,
                             fCnt_current,
-                            datetime.strptime(current_packet_data["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
+                            datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                             current_packet_data["fields"]["phyPayload"][0],
                         ]
 
@@ -342,7 +342,7 @@ def eq_query_get_interpkt(devAddr):
                     'interpkt_time' : [0],
                     'fCnt_diff' : [0],
                     'fCnt' : [fCnt_current],
-                    'mqtt_time' : [datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH)],
+                    'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
                     'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
                 }
                 
@@ -350,14 +350,17 @@ def eq_query_get_interpkt(devAddr):
                 flows_for_thisDevAddr.append({
                     'fCnt_1st': fCnt_current,
                     'fCnt_last': fCnt_current,
-                    'time_1st': datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
-                    'time_last': datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH),
+                    'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                    'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                     'epochtime_last': time_current,
                     'interpkttime_max': DELTA_INTERPKT_ABS_TIME_MAX,
                     'pd_distrib': pd.DataFrame(data=record),
                     #pd.DataFrame({'interpkt_time': [], 'fCnt_diff': [], 'fCnt': [],  'mqtt_time': [], 'phyPayload': [], 'test':[]}),
                 })
-            
+                
+                print( datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH))
+                print(datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH))
+                print(response["hits"]["hits"][i]["fields"]["mqtt_time"][0])
                 
                 #force the type of the column (int) for fCnt
                 #flows_for_thisDevAddr[-1]['pd_distrib']['fCnt'] = int
@@ -368,14 +371,11 @@ def eq_query_get_interpkt(devAddr):
         if (length < tools.queries.QUERY_NB_RESULT):
             break
 
-    #print(pd_these_flows)
-    print("----------")
     #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
     #    print(flows_for_thisDevAddr[0]['pd_distrib'])
 
-    print("----------")
-
-    print(flows_for_thisDevAddr[1]['pd_distrib'])
+    #print("----------")
+    #print(flows_for_thisDevAddr[1]['pd_distrib'])
 
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
@@ -481,7 +481,7 @@ def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
     #get all the mqtt_time for theis devAddr
     for time_1st in pd_all_flows[pd_all_flows['devAddr']== devAddr]['time_1st']:
     
-        filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(time_1st) + '.parquet'
+        filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
         pd_distrib.append(pd.read_parquet(filename_distrib))
         
         if verbose:
@@ -504,7 +504,7 @@ def load_distribs_forDevAddr_and_time_1st_from_disk(devAddr, time_1st, verbose=F
     
     """
      
-    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(time_1st).replace(" ", ".").replace(":", "-").replace("/", "_") + '.parquet'
+    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
     pd_distrib = pd.read_parquet(filename_distrib)
     logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename_distrib)
     
@@ -525,7 +525,7 @@ def save_distrib_to_disk(pd_distrib, devAddr, time_1st):
     """
      
     # store the timeseries in individual files
-    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + str(time_1st).replace(" ", ".").replace(":", "-").replace("/", "_") + '.parquet'
+    filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
     logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename_distrib)
     pd_distrib.to_parquet(filename_distrib)
  
