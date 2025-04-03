@@ -162,7 +162,7 @@ def plot_interpkt_ecdf(values, figname, xlabel):
     g.set(xlim=(values.min(), values.max()))
     
     #label with the typical units of time
-    xvalues = [60000, 3600000, 86400000, 604800000, 2419200000]
+    xvalues = [60, 3600, 86400, 604800, 2419200]
     labels = ["1min", "1h", "1d", "1w", "1m" ]
     g.set_xticks(xvalues, labels=labels)
     
@@ -303,14 +303,14 @@ if __name__ == "__main__":
 
     # plot the EDCF of the median inter packet time (remove samples with not enough packets)
     plot_interpkt_ecdf(
-        values=pd_all_flows['median_interpkt_time_ms'],
+        values=pd_all_flows['median_interpkt_time_ms']/1000,
         figname="figures/flow_distribution_interpkttime.pdf",
         xlabel='Inter pkt time'
     )
     
     # EDCF of the flow duration
     plot_interpkt_ecdf(
-        values=(pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds(),      #in ms
+        values=(pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds(),
         figname="figures/flow_distribution_duration.pdf",
         xlabel="Flow duration"
     )
