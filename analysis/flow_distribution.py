@@ -123,7 +123,7 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
                 pd_distrib['interpkt_time_min'].array
             )
 
-        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time_min'].size)+" pkts/@="+pd_all_flows.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
+        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time_min'].size)+" pkts/@="+pd_all_flows.iloc[plot_list[g_id]]['devAddr'], ylabel='Cumulative Distribution')
          
         #debug
         logger_flow.info(
@@ -156,7 +156,7 @@ def plot_interpkt_ecdf(values, figname, xlabel):
             values,
         log_scale=True
     )
-    g.set(xlabel=xlabel, ylabel='Proportion')
+    g.set(xlabel=xlabel, ylabel='Cumulative Distribution')
     
     # remove values under 1s from the x-coordinates
     g.set(xlim=(values.min(), values.max()))
@@ -223,29 +223,31 @@ def plot_link_quality_distrib(pd_all_flows):
     :param distribution: a pandas dataframe with the data to plot
     
     """
+    logger_flow.info("Plot the distribution of the PRR for all flows")
 
-
+    
     sns.set()
-    sns.set_theme()
+    sns.set_theme(style='whitegrid')
     sns.set(font_scale=1)
+    values = 1 / pd_all_flows['mean_fCnt_diff']
 
-#    print(pd_all_flows)
+    g = sns.ecdfplot(
+        values,
+        log_scale=False
+    )
+    g.set(xlabel='Packet Reception Rate', ylabel='Cumulative Distribution')
+    
+    # remove values under 1s from the x-coordinates
+    #g.set(xlim=(values.min(), values.max()))
+    
+    #save figure
+    plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/flow_distribution_mean_prr.pdf")
+    g.figure.clf()
+         
+         
 
 
-    exit(2)
-
-    for devAddr in pd_all_flows['devAddr'].drop_duplicates():
-        pd_records = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)
-        print("\t devAddr : " + devAddr + " " + str(len(pd_records)))
-        for pd_record in pd_records:
-            print(pd_record[''])
-            
-            
-            
-            
-            exit(5)
-        
-       # print(pd_records)
                     
 
 
@@ -309,19 +311,13 @@ if __name__ == "__main__":
     logger_flow.debug("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
     
-    
-    
-    
-    print(pd_all_flows)
  
 
     # --- plots ---
     
     #link qualities
     plot_link_quality_distrib(pd_all_flows)
-    
-    
-    exit(2)
+
     
     # plot a grid of distributions (invidividual analysis)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
