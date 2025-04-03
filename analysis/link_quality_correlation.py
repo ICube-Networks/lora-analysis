@@ -1,7 +1,8 @@
-""" devEUI & devAddr distribution analysis .
+""" Link quality indicators correlation .
 
-This scripts extracts from an elasticsearch instance statistics concerning
-the devEUI/devAddr distribution
+This scripts selects randomly X packets and plot 
+the correlation between different link quality indicators and features
+
 
 """
 
@@ -42,23 +43,23 @@ import seaborn as sns
    
 #logs
 import logging
-logger_quality = logging.getLogger('quality')
-logger_quality.setLevel(logging.INFO)
+logger_quality_corr = logging.getLogger('quality')
+logger_quality_corr.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 
 #variables
-NUMPACKETS_MAX = 10000
+NUMPACKETS_MAX = 100
 
 
 def  es_query_packets():
     """Elastic search query for an histogram.
     
-    This function sends a query to an elastic search server  to retrieve an histogram (per week) of the number of packets per SF
+    This function sends a query to an elastic search server  to retrieve a bunch of packets, randomly picked in the dataset
     
     :param Elasticsearch clientES: a connection to an elastic search server
     
-    :returns: a pandas DataFrame which contains the counts for each window of the histogram
+    :returns: a pandas DataFrame which contains at most NUMPACKETS_MAX packets
     :rtype: DataFrame
     """
 
@@ -67,14 +68,14 @@ def  es_query_packets():
     #get the number of valid records per SF per channel
     minkey = 0               # we start with the value 0
     counter_numpackets = 0   # we count the numnber of packets we already processed
+    logger_quality_corr.info("Min hash key for the next ES query: " + str(minkey))
     while True:
-        logger_quality.info("Min key for the next ES query: " + str(minkey))
 
         resp = clientES.options(
             basic_auth=(myconfig.user, myconfig.password),
         ).search(
             index=myconfig.index_name,
-            size=tools.queries.QUERY_NB_RESULT,
+            size=min(NUMPACKETS_MAX, tools.queries.QUERY_NB_RESULT),
             query=tools.queries.QUERY_DATA,
             source=False,
             fields=[
@@ -83,7 +84,6 @@ def  es_query_packets():
                 "rxInfo.crcStatus",
                 "rxInfo.channel",
                 "txInfo.loRaModulationInfo.spreadingFactor",
-                "dup_infos.is_duplicate",
                 "mqtt_time"
             ],
             search_after=[
@@ -101,7 +101,6 @@ def  es_query_packets():
             }],
         )
         length = len(resp['hits']['hits'])
-        logger_quality.info("Num records read: " + str(length))
         minkey = resp['hits']['hits'][length-1]['sort'][0]
             
         #extract the results
@@ -117,7 +116,6 @@ def  es_query_packets():
             "fields.rxInfo.crcStatus": "crcStatus",
             "fields.rxInfo.channel": "channel",
             "fields.txInfo.loRaModulationInfo.spreadingFactor": "spreadingFactor",
-            "fields.dup_infos.is_duplicate": "is_duplicate",
         }, errors="raise")
 
         # flatten the values (by default, each value is an array with one element
@@ -126,7 +124,6 @@ def  es_query_packets():
         df_tempo = df_tempo.explode('crcStatus')
         df_tempo = df_tempo.explode('channel')
         df_tempo = df_tempo.explode('spreadingFactor')
-        df_tempo = df_tempo.explode('is_duplicate')
                         
         # Transform boolean fields
         #df_tempo['is_duplicate']  = df_tempo['is_duplicate'].fillna(True)
@@ -137,8 +134,10 @@ def  es_query_packets():
         else:
              results_df = df_tempo
      
-        #stop the iteration now, we have enough results
-        counter_numpackets += tools.queries.QUERY_NB_RESULT
+        #stop the iteration now, we have enough results (or no more results)
+        counter_numpackets += len(resp['hits']['hits'])
+        logger_quality_corr.info("\t " + str(counter_numpackets) + " packets (next min key for the query: " + str(minkey))
+    
         if (len(resp['hits']['hits']) < tools.queries.QUERY_NB_RESULT) or (counter_numpackets >= NUMPACKETS_MAX):
             break
 
@@ -183,12 +182,9 @@ def plot_SF_SNR_RSSI(results_df):
   
 
     # save the figure
-    fig = g.figure.savefig("figures/qual_pairplots.pdf")
+    fig = g.figure.savefig("figures/linkqual_pairplots.pdf")
     g.figure.clf()
 
- 
-
- 
  
 
     
@@ -202,11 +198,15 @@ if __name__ == "__main__":
     
     #elastic search query, transformed in a panda dataFrame
     results_df = es_query_packets()
-    logger_quality.info(results_df)
+    # remove outliers
+    results_df = results_df[results_df['rssi'] < 0]
+    logger_quality_corr.info(results_df)
     
     #plot it
     plot_SF_SNR_RSSI(results_df)
     
 
+    #link quality for each flow
+    
 
 

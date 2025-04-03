@@ -217,6 +217,39 @@ def plot_interpkt_nbpkts(pd_all_flows):
 
 
 
+def plot_link_quality_distrib(pd_all_flows):
+    """ Plot the link quality distribution of flows
+        
+    :param distribution: a pandas dataframe with the data to plot
+    
+    """
+
+
+    sns.set()
+    sns.set_theme()
+    sns.set(font_scale=1)
+
+#    print(pd_all_flows)
+
+
+    exit(2)
+
+    for devAddr in pd_all_flows['devAddr'].drop_duplicates():
+        pd_records = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)
+        print("\t devAddr : " + devAddr + " " + str(len(pd_records)))
+        for pd_record in pd_records:
+            print(pd_record[''])
+            
+            
+            
+            
+            exit(5)
+        
+       # print(pd_records)
+                    
+
+
+
 
 
 # --------------------------------------------------------
@@ -266,14 +299,30 @@ if __name__ == "__main__":
     # ---- disk -----
     # load data that is on the disk (already read previously)
     logger_flow.info("Reading distributions from the disk....")
-    pd_all_flows = extract_interpacket_distribution.load_from_disk()
-    logger_flow.info("> done!")
+    pd_all_flows = extract_interpacket_distribution.load_from_disk(verbose=False)
+    logger_flow.debug("\t\t> "+ str(len(pd_all_flows)) + " devAddrs in the disk")
+    nb_records_unfiltered = len(pd_all_flows)
+
     
     #filtering
-    pd_all_flows = pd_all_flows[(pd_all_flows.nb_pkts >= NB_PKTS_MIN)]
+    pd_all_flows = pd_all_flows[pd_all_flows['nb_pkts'] >= NB_PKTS_MIN]
+    logger_flow.debug("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
+    logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
+    
+    
+    
+    
+    print(pd_all_flows)
  
 
     # --- plots ---
+    
+    #link qualities
+    plot_link_quality_distrib(pd_all_flows)
+    
+    
+    exit(2)
+    
     # plot a grid of distributions (invidividual analysis)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
     nb_cols = math.ceil(math.sqrt(nb_plots))
@@ -282,8 +331,6 @@ if __name__ == "__main__":
 
     #info
     logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time_ms'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
-
-
     
 
     # plot the EDCF of the median inter packet time (remove samples with not enough packets)
@@ -301,7 +348,6 @@ if __name__ == "__main__":
     )
 
 
-    #correlation inter pkt time / nb packets
+    #correlation between inter pkt time / nb packets
     plot_interpkt_nbpkts(pd_all_flows)
 
-#0f9aa96f : distribution en escalier

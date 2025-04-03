@@ -163,6 +163,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'fCnt_last': fCnt_last,
             'time_1st': time_1st,
             'time_last': time_last,
+            'mean_fCnt_diff': pd_distrib['fCnt_diff'].mean(),
             'median_fCnt_diff': pd_distrib['fCnt_diff'].median(),
             'max_fCnt_diff': pd_distrib['fCnt_diff'].max(),
             'median_interpkt_time_ms': pd_distrib['interpkt_time_ms'].median(),
@@ -178,6 +179,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'time_1st': time_1st,
             'time_last': time_last,
             'max_fCnt_diff': [pd.NaT,],
+            'mean_fCnt_diff': [pd.NaT,],
             'median_fCnt_diff': [pd.NaT,],
             'median_interpkt_time_ms': [pd.NaT,],
             'max_interpkt_time_ms': [pd.NaT,],
@@ -420,9 +422,10 @@ def load_from_disk(verbose=False):
     
     """
     pd_all_flows = None
-           
-    logger_preprocflow.info("Loading parquet data from " + FILENAME_DF + ":")
-    logger_preprocflow.info("\t> Reading values ....")
+
+    if verbose:
+        logger_preprocflow.info("Loading parquet data from " + FILENAME_DF + ":")
+        logger_preprocflow.info("\t> Reading values ....")
 
     if  os.path.exists(FILENAME_DF):
         pd_all_flows = pd.read_parquet(FILENAME_DF)
