@@ -141,7 +141,7 @@ def plot_traffic_per_dayofweek(clientES):
     )
     g.set_xlabels('Day of the week')
     g.set_ylabels('Number of packets per day')
-    g.set(ylim=(40000, None))
+    #g.set(ylim=(40000, None))
     
     g.set_xticklabels(tools.dayofweek.short[:len(tools.dayofweek.short)])
     g.tight_layout()

@@ -103,35 +103,35 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
         
      
         #convert into minutes
-        pd_distrib['interpkt_time'] = pd_distrib['interpkt_time']/3600
+        pd_distrib['interpkt_time_ms'] = pd_distrib['interpkt_time_ms']/(3600*10000)
         
 
         if (count > nb_cols):
             g = sns.ecdfplot(
-                pd_distrib['interpkt_time'].array,
+                pd_distrib['interpkt_time_ms'].array,
                 ax=axs[row, col]
             )
         #one single row
         elif count > 1:
             g = sns.ecdfplot(
-                pd_distrib['interpkt_time'].array,
+                pd_distrib['interpkt_time_ms'].array,
                 ax=axs[col]
             )
         #one single plot
         else:
              g = sns.ecdfplot(
-                pd_distrib['interpkt_time'].array
+                pd_distrib['interpkt_time_ms'].array
             )
 
-        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time'].size)+" pkts/@="+pd_all_flows.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
+        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time_ms'].size)+" pkts/@="+pd_all_flows.iloc[plot_list[g_id]]['devAddr'], ylabel='Proportion')
          
         #debug
         logger_flow.info(
         "g_id=" + str(plot_list[g_id]) +
         ", devAddr=" + pd_all_flows.iloc[plot_list[g_id]]['devAddr'] +
-        ", max=" + str(np.max(pd_distrib['interpkt_time'].array)) +
+        ", max=" + str(np.max(pd_distrib['interpkt_time_ms'].array)) +
         ", nbPkts=" + str(pd_all_flows.iloc[plot_list[g_id]]['nb_pkts']) +
-        ", nbPkts3=" + str(pd_distrib['interpkt_time'].size)
+        ", nbPkts3=" + str(pd_distrib['interpkt_time_ms'].size)
         )
 
         
@@ -162,7 +162,7 @@ def plot_interpkt_ecdf(values, figname, xlabel):
     g.set(xlim=(values.min(), values.max()))
     
     #label with the typical units of time
-    xvalues = [60, 3600, 86400, 604800, 2419200]
+    xvalues = [60000, 3600000, 86400000, 604800000, 2419200000]
     labels = ["1min", "1h", "1d", "1w", "1m" ]
     g.set_xticks(xvalues, labels=labels)
     
@@ -191,7 +191,7 @@ def plot_interpkt_nbpkts(pd_all_flows):
 
 
     #g = sns.scatterplot(
-    #    x="median_interpkt_time",
+    #    x="median_interpkt_time_ms",
     #    y="nb_pkts",
     #    data=pd_all_flows
     #    )
@@ -201,13 +201,13 @@ def plot_interpkt_nbpkts(pd_all_flows):
     #   corner=True,
     #    diag_kind="hist",
     )
-    g.map_lower(sns.kdeplot, levels=4, color=".2")
+    g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)
     
     #save figure
     g.figure.savefig("figures/flow_interpkttime_nbpkts_correlation.pdf")
     g.figure.clf()
   
-    r,p = scipy.stats.pearsonr(pd_all_flows["median_interpkt_time"], pd_all_flows["nb_pkts"])
+    r,p = scipy.stats.pearsonr(pd_all_flows['median_interpkt_time_ms'], pd_all_flows["nb_pkts"])
     logger_flow.info('correlation coefficient =' + str(r))
     logger_flow.info('p-value = ' + str(p))
     
@@ -279,24 +279,42 @@ if __name__ == "__main__":
     plot_interpkt_time_distribution_grid(pd_all_flows=pd_all_flows, plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
 
     #info
-    logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
+    logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time_ms'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
+
+
+    #print(pd_all_flows['median_interpkt_time_ms'])
+    print(pd_all_flows[pd_all_flows['median_interpkt_time_ms'] > 1000*60*60*24*30])
+    
+    
+    
+    
+    #pd_records = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, "0239af84", verbose=False)
+    #boug = 0
+    #for record in pd_records:
+    #    print("-----------------------------------------------------")
+    #    print(record)
+    #    print("+++ " + str(boug) + " +++++++++")
+    #    boug = boug + 1
+    
+ 
+    
+    #exit(1)
+    
 
     # plot the EDCF of the median inter packet time (remove samples with not enough packets)
     plot_interpkt_ecdf(
-        values=pd_all_flows['median_interpkt_time'],
+        values=pd_all_flows['median_interpkt_time_ms'],
         figname="figures/flow_distribution_interpkttime.pdf",
         xlabel='Inter pkt time'
     )
     
     # EDCF of the flow duration
     plot_interpkt_ecdf(
-        values=(pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds(),
+        values=(pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds(),      #in ms
         figname="figures/flow_distribution_duration.pdf",
         xlabel="Flow duration"
     )
 
-
-    #PB: certaines courbes avec 4 PJTS ??? normalement pas possilble car filtrage sur >= NB_PKTS_MIN
 
     #correlation inter pkt time / nb packets
     plot_interpkt_nbpkts(pd_all_flows)

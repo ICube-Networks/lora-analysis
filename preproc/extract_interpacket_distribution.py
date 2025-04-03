@@ -165,10 +165,10 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'time_last': time_last,
             'median_fCnt_diff': pd_distrib['fCnt_diff'].median(),
             'max_fCnt_diff': pd_distrib['fCnt_diff'].max(),
-            'median_interpkt_time': pd_distrib['interpkt_time'].median(),
-            'max_time': pd_distrib['interpkt_time'].max(),
-            'min_time': pd_distrib['interpkt_time'].min(),
-            'nb_pkts': [pd_distrib['interpkt_time'].size + 1,],         # number of packets = length of the list + one
+            'median_interpkt_time_ms': pd_distrib['interpkt_time_ms'].median(),
+            'max_interpkt_time_ms': pd_distrib['interpkt_time_ms'].max(),
+            'min_interpkt_time_ms': pd_distrib['interpkt_time_ms'].min(),
+            'nb_pkts': [pd_distrib['interpkt_time_ms'].size + 1,],         # number of packets = length of the list + one
         }
     else:
         record = {
@@ -177,12 +177,12 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'fCnt_last': fCnt_last,
             'time_1st': time_1st,
             'time_last': time_last,
-            'median_interpkt_time': [pd.NaT,],
             'max_fCnt_diff': [pd.NaT,],
             'median_fCnt_diff': [pd.NaT,],
-            'max_time': [pd.NaT,],
-            'min_time': [pd.NaT,],
-            'nb_pkts': [pd_distrib['interpkt_time'].size + 1,] ,        # number of packets = length of the list + one
+            'median_interpkt_time_ms': [pd.NaT,],
+            'max_interpkt_time_ms': [pd.NaT,],
+            'min_interpkt_time_ms': [pd.NaT,],
+            'nb_pkts': [pd_distrib['interpkt_time_ms'].size + 1,] ,        # number of packets = length of the list + one
        }
     
     return(record)
@@ -217,23 +217,23 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
                 ],
             }
         },
- #       runtime_mappings= {
- #           "mqtt_time_epoch_seconds": {
- #               "type": "keyword",
- #               "script": {
- #                   "source": "ZonedDateTime zdt = ZonedDateTime.parse(doc['mqtt_time'].value.toString()); emit(zdt.toEpochMilli().toString())"
- #               }
- #           }
- #       },
+        runtime_mappings= {
+            "mqtt_time_epoch_mseconds": {
+                "type": "keyword",
+                "script": {
+                    "source": "ZonedDateTime zdt = ZonedDateTime.parse(doc['mqtt_time'].value.toString()); emit(zdt.toEpochMilli().toString())"
+                }
+            }
+        },
         fields=[
             "mqtt_time",
             "extra_infos.phyPayload.macPayload.fhdr.fCnt",
-  #          "mqtt_time_epoch_seconds",
+            "mqtt_time_epoch_mseconds",
             "_id",
             "phyPayload",
         ],
         sort=[
-            {"mqtt_time" : "asc"}
+            "mqtt_time",
         ],
         search_after=[mqtt_time_min],
         source = False
@@ -280,14 +280,14 @@ def eq_query_get_interpkt(devAddr):
         logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
         
         #no remaining response
-        length = len(response["hits"]["hits"])
-        
+        length = len(response["hits"])
+                  
         if (length == 0):
             logger_preprocflow.error("No packet matches for devAddr " + devAddr)
             break
 
         # identification of the flows for all the packets
-        for i in range(0, len(response["hits"]["hits"])): #  - 1):
+        for i in range(0, len(response["hits"]["hits"])):
             found = False
                         
             current_packet_data = response["hits"]["hits"][i]
@@ -296,13 +296,13 @@ def eq_query_get_interpkt(devAddr):
 
             #search for an active flow to which the current packet may correspond
             for flow in flows_for_thisDevAddr:
-                time_difference = time_current - flow['epochtime_last']
+                time_difference_ms = time_current - flow['epochtime_last']
                 
                 # is it same flow ?
                 # 1nd condition: the time between two packets does not exceed a given DELTA value
                 #the sorting field is the mqtt_time (in epoch format)
                 #diff_time = response["hits"]["hits"][i]["sort"][0] - flow['time_last']
-                if (time_difference <=  flow['interpkttime_max']):
+                if (time_difference_ms <=  DELTA_INTERPKT_ABS_TIME_MAX):
                   
                     #frame counter difference
                     fCnt_difference = fCnt_current - flow['fCnt_last']
@@ -317,12 +317,11 @@ def eq_query_get_interpkt(devAddr):
                         flow['fCnt_last'] = max(flow['fCnt_last'], fCnt_current)
                         flow['epochtime_last'] = time_current
                         flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
-                        # update the interpacket time max for this flow (current value or current time_diff * DELTA_MAX)
-                        #flow['interpkttime_max'] = max(flow['interpkttime_max'], time_difference * DELTA_INTERPKT_REL_TIME_MAX)
+
 
                         # create a pandas record at the end of the distrib
                         flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
-                            time_difference,
+                            time_difference_ms,
                             fCnt_difference,
                             fCnt_current,
                             datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
@@ -339,7 +338,7 @@ def eq_query_get_interpkt(devAddr):
             if found is False:
                 
                 record = {
-                    'interpkt_time' : [0],
+                    'interpkt_time_ms' : [0],
                     'fCnt_diff' : [0],
                     'fCnt' : [fCnt_current],
                     'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
@@ -353,15 +352,11 @@ def eq_query_get_interpkt(devAddr):
                     'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                     'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                     'epochtime_last': time_current,
-                    'interpkttime_max': DELTA_INTERPKT_ABS_TIME_MAX,
                     'pd_distrib': pd.DataFrame(data=record),
-                    #pd.DataFrame({'interpkt_time': [], 'fCnt_diff': [], 'fCnt': [],  'mqtt_time': [], 'phyPayload': [], 'test':[]}),
+                    #pd.DataFrame({'interpkt_time_ms': [], 'fCnt_diff': [], 'fCnt': [],  'mqtt_time': [], 'phyPayload': [], 'test':[]}),
                 })
                 
-                print( datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH))
-                print(datetime.strptime(response["hits"]["hits"][i]["fields"]["mqtt_time"][0], DATE_FORMAT_ELASTICSEARCH))
-                print(response["hits"]["hits"][i]["fields"]["mqtt_time"][0])
-                
+                    
                 #force the type of the column (int) for fCnt
                 #flows_for_thisDevAddr[-1]['pd_distrib']['fCnt'] = int
                 #flows_for_thisDevAddr[-1]['pd_distrib']['fCnt_diff'] = int
@@ -389,7 +384,7 @@ def eq_query_get_interpkt(devAddr):
         # the individual values are not anymore useful
         del(flow['pd_distrib'])
 
-        #print( "size=" + str(flow['pd_distrib']['interpkt_time'].size + 1) + " nbPkts="+ str(record['nb_pkts'])+ " fCnt_1st="+ str(record['fCnt_1st'])+ " devAddr="+ str(record['devAddr']))
+        #print( "size=" + str(flow['pd_distrib']['interpkt_time_ms'].size + 1) + " nbPkts="+ str(record['nb_pkts'])+ " fCnt_1st="+ str(record['fCnt_1st'])+ " devAddr="+ str(record['devAddr']))
         
         #add this flow to the list of flows for this devAddr
         if 'pd_these_flows' not in locals():
@@ -397,7 +392,7 @@ def eq_query_get_interpkt(devAddr):
         else:
             pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record_summary)], ignore_index=True)
             
-    print(pd_these_flows)
+        #print(pd_these_flows)
 
 
     if 'pd_these_flows' not in locals():
@@ -421,10 +416,7 @@ def load_from_disk(verbose=False):
     """ Load from disk the dataframe (with parquet)
         
     :return pd_all_flows: the pandas dataframe
-    3 columns:
-    devAddr: string
-    median_interpkt_time: delta_time
-    nb_pkt: integer
+
     
     """
     pd_all_flows = None
@@ -451,14 +443,14 @@ def save_to_disk(pd_all_flows):
     :param pd_all_flows: the pandas dataframe
     X columns:
     devAddr: string
-    median_interpkt_time: float (seconds)
+    median_interpkt_time_ms: float (seconds)
     nb_pkt: integer
     etc.
     """
 
     
     # savings separately the dataframe without the individual distributions p(arquet format)
-    #pd_all_flows[['devAddr', 'nb_pkts', 'median_interpkt_time']].to_parquet(FILENAME_DF)
+    #pd_all_flows[['devAddr', 'nb_pkts', 'median_interpkt_time_ms']].to_parquet(FILENAME_DF)
     pd_all_flows.to_parquet(FILENAME_DF)
    
       
@@ -485,7 +477,7 @@ def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
         pd_distrib.append(pd.read_parquet(filename_distrib))
         
         if verbose:
-           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename)
+           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time_ms'].size) + " filename=" + filename)
  
     
     return(pd_distrib)
@@ -506,7 +498,7 @@ def load_distribs_forDevAddr_and_time_1st_from_disk(devAddr, time_1st, verbose=F
      
     filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
     pd_distrib = pd.read_parquet(filename_distrib)
-    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename_distrib)
+    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time_ms'].size) + " filename=" + filename_distrib)
     
      
     return(pd_distrib)
@@ -526,7 +518,7 @@ def save_distrib_to_disk(pd_distrib, devAddr, time_1st):
      
     # store the timeseries in individual files
     filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
-    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time'].size) + " filename=" + filename_distrib)
+    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time_ms'].size) + " filename=" + filename_distrib)
     pd_distrib.to_parquet(filename_distrib)
  
  
@@ -579,7 +571,7 @@ class Application:
         
         # empty pandas dataframe (none read from the disk) -> let's create it
         if self.pd_all_flows is  None:
-            self.pd_all_flows = pd.DataFrame({'devAddr': [], 'fCnt_1st': [], 'fCnt_last': [], 'time_1st': [], 'time_last': [], 'median_interpkt_time': [], 'max_time': [], 'min_time': [], 'nb_pkts': []})
+            self.pd_all_flows = pd.DataFrame({'devAddr': [], 'fCnt_1st': [], 'fCnt_last': [], 'time_1st': [], 'time_last': [], 'median_interpkt_time_ms': [], 'max_interpkt_time_ms': [], 'min_interpkt_time_ms': [], 'nb_pkts': []})
             
 
         # Else, some have already been extracted from the disk
@@ -629,8 +621,7 @@ class Application:
                 print("------- Application interrupted ----- ")
                 break
                 
-            #debug
-            break
+
       
       
       
@@ -664,19 +655,4 @@ if __name__ == "__main__":
     # save the pandas frame to the disk
     save_to_disk(app.pd_all_flows)
 
-
-
-
-def obsolete():
-    print(app.pd_all_flows)
-    pd_records = load_distribs_forDevAddr_from_disk(app.pd_all_flows, "000173b7", verbose=False)
-    boug = 0
-    for record in pd_records:
-        print("-----------------------------------------------------")
-        print(record)
-        print("+++ " + str(boug) + " +++++++++")
-        boug = boug + 1
-    
-    
-    exit(1)
 

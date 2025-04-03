@@ -176,7 +176,7 @@ def plot_SF_SNR_RSSI(results_df):
     g = sns.pairplot(
         data=results_df,
         diag_kind="kde",
-        corner=True,
+#        corner=True,
     )
     g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)     # no warning if we have no variance for one variable
     
