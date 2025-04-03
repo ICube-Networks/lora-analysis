@@ -656,3 +656,19 @@ if __name__ == "__main__":
     save_to_disk(app.pd_all_flows)
 
 
+     
+    
+    
+    
+    #pd_records = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, "0239af84", verbose=False)
+    #boug = 0
+    #for record in pd_records:
+    #    print("-----------------------------------------------------")
+    #    print(record)
+    #    print("+++ " + str(boug) + " +++++++++")
+    #    boug = boug + 1
+    
+ 
+    
+    #exit(1)
+ 
