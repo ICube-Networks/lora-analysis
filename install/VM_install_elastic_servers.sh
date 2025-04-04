@@ -17,6 +17,13 @@ echo "*******************************************"
 apt-get -y install gpg
 apt-get -y install apt-transport-https
 
+if [ -e "/usr/share/keyrings/elasticsearch-keyring.gpg" ]:
+then
+    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+
+    echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
+fi
+
 echo ""
 echo ""
 
@@ -24,11 +31,6 @@ echo ""
 echo "*******************************************"
 echo "*          ELASTIC-SEARCH - install       * "
 echo "*******************************************"
-
-
-wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
-
-echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
 
 apt-get update && apt-get -y install elasticsearch
 
@@ -60,7 +62,7 @@ printf "wait for the end of the install .."
 ES_ADMIN_PASS=""
 while [ -z "${ES_ADMIN_PASS}" ]
 do
-    ES_ADMIN_PASS=`bin/elasticsearch-reset-password -u elastic -b  | grep "New value" | cut -d ":" -f 2 |sed 's/ //g'|sed 's/ //g'`
+    ES_ADMIN_PASS=`/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b  | grep "New value" | cut -d ":" -f 2 |sed 's/ //g'|sed 's/ //g'`
     printf ".."
 done
 #ES_ADMIN_PASS=`echo "${ES_ADMIN_PASS//[$'\t\r\n ']}"`
