@@ -11,22 +11,35 @@ CONFIG_FILE="../config/myconfig.py"
 
 #download and run the elastic search image
 echo "*******************************************"
-echo "*      ELASTIC-SEARCH - instantiation     *\n"
+echo "*      PRE CONFIGURATION                  *"
 echo "*******************************************"
+
+apt-get -y install gpg
+apt-get -y install apt-transport-https
+
+echo ""
+echo ""
+
+#download and run the elastic search image
+echo "*******************************************"
+echo "*          ELASTIC-SEARCH - install       * "
+echo "*******************************************"
+
+
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
-apt-get install apt-transport-https
+
 echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
 
-apt-get update && apt-get install elasticsearch
+apt-get update && apt-get -y install elasticsearch
 
 echo ""
 echo ""
 
 #kibana
 echo "*******************************************"
-echo "*         KIBANA - instantiation         *"
+echo "*           KIBANA - install              * "
 echo "*******************************************"
-apt-get install kibana
+apt-get -y install kibana
 
 echo ""
 echo ""
