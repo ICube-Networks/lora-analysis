@@ -388,7 +388,8 @@ def elasticsearch_open_connection():
     DEBUG_ES = False
     clientES = Elasticsearch(
         "https://"+myconfig.hostname+":9200",
-        ssl_assert_fingerprint=(myconfig.cert_fingerprint), #certificate of the server (its fingerprint)
+        
+#        ssl_assert_fingerprint=(myconfig.cert_fingerprint), #certificate of the server (its fingerprint)
         basic_auth=(myconfig.user, myconfig.password),      #credentials
         request_timeout=3000,                              #10s for the requests
     )
