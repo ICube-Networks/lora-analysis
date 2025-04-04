@@ -42,8 +42,22 @@ echo "*           KIBANA - install              * "
 echo "*******************************************"
 apt-get -y install kibana
 
+sed -i 's/\(#server.host: "localhost"\).*/server.host: "0.0.0.0"/' /etc/kibana/kibana.ymlb 
+sed -i 's/\(#\).*//' /etc/kibana/kibana.ymlb 
+sed -i 's/\(#\).*//' /etc/kibana/kibana.ymlb 
+sed -i 's/\(#\).*//' /etc/kibana/kibana.ymlb 
+
+sed -i 's/${TEXTE1}.*/${TEXTE2}/' /etc/kibana/kibana.ymlb 
+
+
+server.ssl.enabled
+
 echo ""
 echo ""
+
+
+exit
+
 
 
 #kibana

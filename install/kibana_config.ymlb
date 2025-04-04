@@ -1,0 +1,9 @@
+#KIBANA CUSTOM
+
+#listen to non local connections
+server.host: "0.0.0.0"
+
+#ssl keys with certbot
+server.ssl.enabled: true
+server.ssl.certificate: /etc/kibana/fullchain.pem 
+server.ssl.key: /etc/kibana/privkey-pem
