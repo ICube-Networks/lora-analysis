@@ -1,5 +1,6 @@
 # Get / del the packets for a period 
 
+```
 
 	GET /lora-index/_search?pretty=true
 	{
@@ -20,10 +21,12 @@
 	    }
 	  }
 	 }
+```
 	 
  
  
  Be careful: limit the nb of docs to delete simultaneously (15 days = 15,000 docs are ok)
+```
   
 	POST /lora-index/_delete_by_query
 	{
@@ -42,3 +45,4 @@
 	    }
 	  }
 	 }
+```

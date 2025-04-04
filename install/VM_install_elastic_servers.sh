@@ -22,6 +22,7 @@ apt-get -y install gpg
 apt-get -y install apt-transport-https
 apt-get -y install dnsutils
 apt-get -y install certbot
+apt-get -y install npm
 
 
 if [ -e "/usr/share/keyrings/elasticsearch-keyring.gpg" ]

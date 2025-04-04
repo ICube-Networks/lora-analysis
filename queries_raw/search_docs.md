@@ -1,40 +1,61 @@
-# search with the id of the doc
 
 
+# search : id or payload
 
-GET /lora-index/_search?pretty=true
-{
-  "query": {
-		"bool": {
-      "filter" : [
-        {"match": {"_id": "Zpd8DnUBJ8aGN70ZCEW4"}}
-      ]
-    }
+
+To get an entry with its id
+
+```
+
+	GET /lora-index/_search?pretty=true
+	{
+	  "size": 10,
+	  "timeout": "3000s",
+	  "query": {
+		    "bool": {
+		       "must": [
+		         {
+	            "term": {
+	                    "_id": "X7jrIHUBJ8aGN70ZB0tO"
+	                }
+		         }
+	          ]
+		    }
+		  }
 	}
-}
+	
+```
+	
+	
+To get an entry with its Phy payload
 
+	
+```
 
+	GET /lora-index-short/_search?pretty=true
+		{
+		  "size": 10,
+		  "timeout": "3000s",
+		  "query": {
+			    "bool": {
+			       "must": [
+			         {
+		            "term": {
+		                    "phyPayload.keyword": "QPXn2g6A4LUCf+qViIUpWAM4gQYUZvK82tsc"
+		                }
+			         }
+		          ]
+			    }
+			  }
+		}
+```
 
-# search with phyPayload
-
-
-
-
-GET /lora-index/_search?pretty=true
-{
-  "query": {
-		"bool": {
-      "filter" : [
-        {"match": {"phyPayload": "+0EPOH56oFbkkTeqvTKO6MVUrYoZ"}}
-      ]
-    }
-	}
-}
 
 
 
 # phypayload + mqtt_time min
 
+```
 
 GET /lora-index/_search?pretty=true
 {
@@ -60,12 +81,13 @@ GET /lora-index/_search?pretty=true
     }
 	}
 }
+```
 
 
 # between two dates
 
 
-	
+```	
 	GET /lora-index/_search?pretty=true
 	{
 	  "size": 10000,
@@ -85,9 +107,12 @@ GET /lora-index/_search?pretty=true
 	    }
 	  }
 	 }
+```
+
 	 
 # a PhyPayload without dup_info
 
+```
 GET /lora-index/_search?pretty=true
 	{
 	 "size": 2000,
@@ -106,11 +131,13 @@ GET /lora-index/_search?pretty=true
       ]
 	}
 	
+```
 	
 	
 
 # complex query
 
+```
 
 GET /lora-index/_search?pretty=true
 	{
@@ -137,4 +164,6 @@ GET /lora-index/_search?pretty=true
         { "mqtt_time" : "asc" }
       ]
 	}
+```
+	
 	

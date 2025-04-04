@@ -2,6 +2,7 @@
 
 to get the number of records for which the frame has not been decoded (the records are modified through `dataset_addfields.py`)
 
+```
 
 	GET /lora-index/_search?pretty=true
 	{
@@ -26,66 +27,35 @@ to get the number of records for which the frame has not been decoded (the recor
 	    }
 	  }
 	}
+```
+
+# number of docs after a given date
 
 
-# clone an index
 
-to clone lora-index into lora-index-short (working copy)
-
-	POST _reindex
+```
+	GET /lora-index-short/_search?pretty=true
 	{
-	  "source": {
-	    "index": "lora-index"
-	  },
-	  "dest": {
-	    "index": "lora-index-short"
+	  "size":0,	  
+	  "query": {
+            "bool": {
+                "filter": [{
+                    "range":{
+                        "mqtt_time":{
+                            "gte": "2020-11-01"
+                        }
+                    }
+                }]
+            }
+        },
+        "aggs":{
+	    "rxInfo":{
+	      "terms":{
+	        "field":"txInfo.modulation.keyword",
+	        "size":100000000
+	      }
+	    }
 	  }
 	}
 
-
-
-# search for an entry
-
-
-To get an entry with its id
-
-
-	GET /lora-index/_search?pretty=true
-	{
-	  "size": 10,
-	  "timeout": "3000s",
-	  "query": {
-		    "bool": {
-		       "must": [
-		         {
-	            "term": {
-	                    "_id": "X7jrIHUBJ8aGN70ZB0tO"
-	                }
-		         }
-	          ]
-		    }
-		  }
-	}
-	
-	
-	
-To get an entry with its Phy payload
-
-	
-
-	GET /lora-index-short/_search?pretty=true
-		{
-		  "size": 10,
-		  "timeout": "3000s",
-		  "query": {
-			    "bool": {
-			       "must": [
-			         {
-		            "term": {
-		                    "phyPayload.keyword": "QPXn2g6A4LUCf+qViIUpWAM4gQYUZvK82tsc"
-		                }
-			         }
-		          ]
-			    }
-			  }
-		}
+```
