@@ -55,7 +55,10 @@ echo "*           RUNNING              * "
 echo "*******************************************"
 service elasticsearch start
 
+echo "Elasticsearch started"
 
+echo ""
+echo ""
 
 
 #CONFIG
@@ -108,7 +111,7 @@ echo "enroll_key=\"${ES_ENROL_KEY//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 KIB_CODE_VERIF=""
 while [ -z "${KIB_CODE_VERIF}" ]
 do
-    KIB_CODE_VERIF=`/usr/share/elasticsearch/bin/kibana-verification-code | grep "verification code"| cut -d ":" -f 2`
+    KIB_CODE_VERIF=`/usr/share/kibana/bin/kibana-verification-code | grep "verification code"| cut -d ":" -f 2`
 done
 echo "--> VERIF_CODE=$KIB_CODE_VERIF"
 echo "verif_code=\"${KIB_CODE_VERIF//[$'\t\r\n ']}\"" >> $CONFIG_FILE
