@@ -3,8 +3,13 @@ CONTAINER_ES_NAME="elastic-server"
 CONTAINER_KIB_NAME="kibana-server"
 
 CONFIG_FILE="../config/myconfig.py"
-DIR_CONFIG = echo $CONFIG_FILE | rev | cut -d "/" -f "2-" | rev
+DIR_CONFIG=`echo $CONFIG_FILE | rev | cut -d "/" -f "2-" | rev`
 mkdir $DIR_CONFIG
+
+IP=`/sbin/ifconfig eth0 | grep -i mask | awk '{print $2}'| cut -f2 -d:`
+HOSTNAME=`host $IP |  rev  | cut -d " " -f 1 | cut -d "." -f "2-" | rev `
+echo "Configuring the hostname to $HOSTNAME"
+hostnamectl set-hostname $HOSTNAME
 
 
 
@@ -15,13 +20,25 @@ echo "*******************************************"
 
 apt-get -y install gpg
 apt-get -y install apt-transport-https
+apt-get -y install dnsutils
+apt-get -y install certbot
 
-if [ -e "/usr/share/keyrings/elasticsearch-keyring.gpg" ]:
+
+if [ -e "/usr/share/keyrings/elasticsearch-keyring.gpg" ]
 then
+    echo "The key of elasticsearch has already been imported"
+else
     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
 
     echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
 fi
+
+# certfiicate
+ufw allow http
+certbot certonly --standalone  -d $HOSTNAME --register-unsafely-without-email --agree-tos --keep-until-expiring 
+ufw deny http
+
+
 
 echo ""
 echo ""
@@ -42,15 +59,38 @@ echo "*           KIBANA - install              * "
 echo "*******************************************"
 apt-get -y install kibana
 
+
+
+if grep -q "#KIBANA CUSTOM" /etc/kibana/kibana.yml
+then 
+	echo "Kibana' consfiguration is already correct"
+else
+	echo "Kibana's configuration updated"
+	cat kibana_config.yml >> /etc/kibana/kibana.yml
+fi	
+
+#copy certificates
+CERTS_DIR="/etc/kibana/certs"
+mkdir $CERTS_DIR
+cp /etc/letsencrypt/live/$HOSTNAME/privkey.pem $CERTS_DIR
+cp /etc/letsencrypt/live/$HOSTNAME/fullchain.pem $CERTS_DIR
+chmod 666  /etc/kibana/certs/privkey.pem
+chmod 666  /etc/kibana/certs/fullchain.pem
+
+
 echo ""
 echo ""
+
+
+
 
 
 #kibana
 echo "*******************************************"
-echo "*           RUNNING              * "
+echo "*           RUNNING                        * "
 echo "*******************************************"
-service elasticsearch start
+service elasticsearch restart
+service kibana restart
 
 echo "Elasticsearch started"
 
