@@ -2,9 +2,6 @@
 CONTAINER_ES_NAME="elastic-server"
 CONTAINER_KIB_NAME="kibana-server"
 
-ES_VERSION="8.11.1"
-KIB_VERSION="8.11.1"
-
 CONFIG_FILE="../config/myconfig.py"
 DIR_CONFIG = echo $CONFIG_FILE | rev | cut -d "/" -f "2-" | rev
 mkdir $DIR_CONFIG
@@ -95,7 +92,7 @@ echo "password=\"${ES_ADMIN_PASS//[$'\t\r\n ']}\"" >> $CONFIG_FILE  #remove the 
 echo "hostname=\"localhost\"" >> $CONFIG_FILE
 echo "index_name=\"lora-index\"" >> $CONFIG_FILE
 echo "cert_fingerprint=\"${ES_CERT_FINGER//[$'\t\r\n ']}\"" >> $CONFIG_FILE
-echo "echo "directory_data=\"`cd ..; pwd`/data/\"" >> $CONFIG_FILE
+echo "echo \"directory_data=\"`cd ..; pwd`/data/\"" >> $CONFIG_FILE
 
 
 #Enrollment key for elastic search
@@ -116,7 +113,6 @@ done
 echo "--> VERIF_CODE=$KIB_CODE_VERIF"
 echo "verif_code=\"${KIB_CODE_VERIF//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 echo ""
-
 
 
 
