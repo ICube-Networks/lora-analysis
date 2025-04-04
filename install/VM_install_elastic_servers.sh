@@ -117,4 +117,4 @@ echo ""
 
 
 echo "Use now your browser to open http://localhost:5601/ with the credentials above"
-echo "docker exec -it $CONTAINER_KIB_NAME bin/kibana-verification-code"
+echo "/usr/share/kibana/bin/kibana-verification-code"
