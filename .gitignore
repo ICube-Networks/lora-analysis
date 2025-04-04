@@ -189,3 +189,4 @@ analysis/figures/*
 # other repo
 lora-tools/
 parser/tmp
+config/myconfig.py.old

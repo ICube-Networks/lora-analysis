@@ -129,10 +129,10 @@ echo "--> USER=elastic"
 echo "--> PASSWORD=$ES_ADMIN_PASS"
 echo "user=\"elastic\"" >> $CONFIG_FILE
 echo "password=\"${ES_ADMIN_PASS//[$'\t\r\n ']}\"" >> $CONFIG_FILE  #remove the EOL, etc.
-echo "hostname=\"localhost\"" >> $CONFIG_FILE
+echo "hostname=\"$HOSTNAME\"" >> $CONFIG_FILE
 echo "index_name=\"lora-index\"" >> $CONFIG_FILE
 echo "cert_fingerprint=\"${ES_CERT_FINGER//[$'\t\r\n ']}\"" >> $CONFIG_FILE
-echo "echo \"directory_data=\"`cd ..; pwd`/data/\"" >> $CONFIG_FILE
+echo "directory_data=\"`cd ..; pwd`/data/\"" >> $CONFIG_FILE
 
 
 #Enrollment key for elastic search
