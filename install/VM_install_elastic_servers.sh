@@ -6,6 +6,8 @@ ES_VERSION="8.11.1"
 KIB_VERSION="8.11.1"
 
 CONFIG_FILE="../config/myconfig.py"
+DIR_CONFIG = echo $CONFIG_FILE | rev | cut -d "/" -f "2-" | rev
+mkdir $DIR_CONFIG
 
 
 
@@ -46,7 +48,17 @@ apt-get -y install kibana
 echo ""
 echo ""
 
+
 #kibana
+echo "*******************************************"
+echo "*           RUNNING              * "
+echo "*******************************************"
+service elasticsearch start
+
+
+
+
+#CONFIG
 echo "*******************************************"
 echo "*               CONFIGURATION             *"
 echo "*******************************************"
@@ -87,7 +99,7 @@ echo "echo "directory_data=\"`cd ..; pwd`/data/\"" >> $CONFIG_FILE
 ES_ENROL_KEY=""
 while [ -z "${ES_ENROL_KEY}" ]
 do
-    ES_ENROL_KEY=`bin/elasticsearch-create-enrollment-token --scope kibana`
+    ES_ENROL_KEY=`/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token --scope kibana`
 done
 echo "--> ENROL_KEY=$ES_ENROL_KEY"
 echo "enroll_key=\"${ES_ENROL_KEY//[$'\t\r\n ']}\"" >> $CONFIG_FILE
@@ -96,7 +108,7 @@ echo "enroll_key=\"${ES_ENROL_KEY//[$'\t\r\n ']}\"" >> $CONFIG_FILE
 KIB_CODE_VERIF=""
 while [ -z "${KIB_CODE_VERIF}" ]
 do
-    KIB_CODE_VERIF=`bin/kibana-verification-code | grep "verification code"| cut -d ":" -f 2`
+    KIB_CODE_VERIF=`/usr/share/elasticsearch/bin/kibana-verification-code | grep "verification code"| cut -d ":" -f 2`
 done
 echo "--> VERIF_CODE=$KIB_CODE_VERIF"
 echo "verif_code=\"${KIB_CODE_VERIF//[$'\t\r\n ']}\"" >> $CONFIG_FILE
