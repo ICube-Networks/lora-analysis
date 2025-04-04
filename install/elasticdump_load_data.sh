@@ -25,17 +25,20 @@ PASSWORD=`cat ../config/myconfig.py | grep "password" | cut -d '"' -f 2`
 HOSTNAME=`cat ../config/myconfig.py | grep "hostname" | cut -d '"' -f 2`
 
 #npm verification
-if ! npm -v &> /dev/null
+npm -v
+if [ $? -ne 0 ] 
 then
     echo "npm could not be found"
+    echo "install it with apt install npm"
     exit 1
 fi
 
 #install npm elastic dump if required
-ELASTICDUMP_BIN="../node_modules/elasticdump/bin/elasticdump"
-if [[ ! -x $ELASTICDUMP_BIN ]]
+ELASTICDUMP_BIN="elasticdump"
+TEST_EXIST=`whereis $ELASTICDUMP_BIN | cut -d ":" -f "2"`
+if [ -z $TEST_EXIST ]
 then
-    npm install elasticdump
+    npm install elasticdump -g
 fi
 
 
@@ -64,14 +67,14 @@ do
     
     
     echo "
-    NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
+    NODE_TLS_REJECT_UNAUTHORIZED=0 ${ELASTICDUMP_BIN} \
 --output=https://${USER}:${PASSWORD}@${HOSTNAME}:9200/$INDEX_NAME \
 --input=${filename_json} \
 --type=data --limit=10000
        "
 
 
-    NODE_TLS_REJECT_UNAUTHORIZED=0 ./${ELASTICDUMP_BIN} \
+    NODE_TLS_REJECT_UNAUTHORIZED=0 ${ELASTICDUMP_BIN} \
             --output=https://${USER}:${PASSWORD}@${HOSTNAME}:9200/$INDEX_NAME \
             --input=${filename_json} \
             --type=data --limit=10000
