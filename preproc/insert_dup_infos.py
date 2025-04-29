@@ -76,8 +76,8 @@ def create_updated_entries(response):
     
     # critical error if a phyPayload wraps several queries and mqtt time diff not sufficient
     if len(response) == tools.queries.QUERY_NB_RESULT and response[0]['_source']['phyPayload'] == response[len(response)-1]['_source']['phyPayload']:
-        
-        diff_time = datetime.strptime(tools.time.fixMicroseconds(response[len(response)]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(tools.time.fixMicroseconds(response[0]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
+
+        diff_time = datetime.strptime(tools.time.fixMicroseconds(response[-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(tools.time.fixMicroseconds(response[0]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
         
         
         if (diff_time <= timedelta(minutes = OFFSET_MINUTES_MAX)):
