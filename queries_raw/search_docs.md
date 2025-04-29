@@ -133,6 +133,29 @@ GET /lora-index/_search?pretty=true
 	
 ```
 	
+	 
+# a PhyPayload without tx_info
+
+```
+GET /lora-index/_search?pretty=true
+	{
+	 "size": 2000,
+	 "timeout": "100s",
+	  "query": {
+	    "bool": {
+	      "must_not": [
+          {"exists": {"field": "txInfo"}}
+        ]
+      }
+	  },
+      "sort" : [
+        { "mqtt_time" : "asc" }
+      ]
+	}
+	
+```
+	
+
 	
 
 # complex query
