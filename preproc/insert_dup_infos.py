@@ -46,7 +46,7 @@ import flask
 import logging
 LOGGER = logging.getLogger('dataset_flag_duplicates')
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
+logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 
 #profiling
@@ -75,15 +75,16 @@ def create_updated_entries(response):
     #print(response)
     
     # critical error if a phyPayload wraps several queries and mqtt time diff not sufficient
-    if len(response) == tools.queries.QUERY_NB_RESULT and response[0]['_source']['phyPayload'] == response[len(response)-1]['_source']['phyPayload']:
+    if len(response) == tools.queries.QUERY_NB_RESULT and response[0]['_source']['phyPayload'] == response[-1]['_source']['phyPayload']:
 
         diff_time = datetime.strptime(tools.time.fixMicroseconds(response[-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(tools.time.fixMicroseconds(response[0]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
-        
         
         if (diff_time <= timedelta(minutes = OFFSET_MINUTES_MAX)):
             LOGGER.critical("The time difference for phyPayload "+   + " is equal to " + str(diff_time))
             LOGGER.critical("We may miss some duplicates -> let's top here")
             exit(4)
+
+    
 
     
     found = False   # used only for index=1, else, it is handled in the tests
@@ -132,8 +133,8 @@ def create_updated_entries(response):
         req_update['_index']       = myconfig.index_name
         req_update['_id']          = response[index]['_id']
         req_update['dup_infos']    = dup_infos
-        LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
-        LOGGER.debug(req_update['_id'])
+        #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+        #LOGGER.debug(req_update['_id'])
         
         # insert this update to the current sequence
         bulk_update.append(req_update)
@@ -243,7 +244,7 @@ if __name__ == "__main__":
         )
         
         # if all the results own to the same payload, split the query with its mqtt_time
-        if len(response) == tools.queries.QUERY_NB_RESULT and response[0]['_source']['phyPayload'] == response[len(response)-1]['_source']['phyPayload']:
+        if len(response['hits']['hits']) == tools.queries.QUERY_NB_RESULT and response['hits']['hits'][0]['_source']['phyPayload'] == response['hits']['hits'][-1]['_source']['phyPayload']:
             
 
             # to detect all the duplicates, shift the mqtt_time_min in the past!
