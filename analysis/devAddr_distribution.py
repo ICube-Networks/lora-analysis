@@ -199,38 +199,44 @@ def es_query_devaddr_duration(operator, field_scope, field_value):
         logger_devaddr.info("Min key for the next ES query: " + min_next)
 
         #get the number of valid records per day of the week
-        resp = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password)
-        ).search(
-            index=myconfig.index_name,
-            size=0,
-            pretty=True,
-            human=True,
-            query=tools.queries.QUERY_DATA_NODUP,
-            aggs={
-                field_scope: {
-                    "composite": {
-                    "size" : tools.queries.QUERY_NB_RESULT,
-                    "sources": [{
-                        field_scope: {
-                            "terms": {"field": field_scope}
-                        }
-                    }],
-                    "after": { field_scope: min_next }
+        try:
+            resp = clientES.options(
+                basic_auth=(myconfig.user, myconfig.password)
+            ).search(
+                index=myconfig.index_name,
+                size=0,
+                pretty=True,
+                human=True,
+                query=tools.queries.QUERY_DATA_NODUP,
+                aggs={
+                    field_scope: {
+                        "composite": {
+                        "size" : tools.queries.QUERY_NB_RESULT,
+                        "sources": [{
+                            field_scope: {
+                                "terms": {"field": field_scope}
+                            }
+                        }],
+                        "after": { field_scope: min_next }
+                      },
+                      "aggs":{
+                        operator+field_value: {operator: {"field": field_value}},
+                        "max"+field_value: {"max": {"field": field_value}}
+                      }
+                    }
                   },
-                  "aggs":{
-                    operator+field_value: {operator: {"field": field_value}},
-                    "max"+field_value: {"max": {"field": field_value}}
-                  }
-                }
-              },
-              sort=[
-                {field_scope : "asc"},
-              ],
-              search_after=[
-                min_next
-              ],
-        )
+                  sort=[
+                    {field_scope : "asc"},
+                  ],
+                  search_after=[
+                    min_next
+                  ],
+            )
+
+        # handle the exception
+        except Exception as error:
+            print("An exception occurred:", error) # An exception occurred: division by zero
+            exit(5)
                
         #next minimum value
         min_next = resp['aggregations'][field_scope]['after_key'][field_scope]

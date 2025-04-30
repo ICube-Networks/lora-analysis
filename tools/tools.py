@@ -204,7 +204,6 @@ class queries:
     
     # max number of results for one query
     QUERY_NB_RESULT = 10000
-   
   
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST =  {

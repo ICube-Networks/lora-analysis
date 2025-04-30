@@ -300,10 +300,16 @@ if __name__ == "__main__":
        
     # ---- disk -----
     # load data that is on the disk (already read previously)
+    pd_all_flows = extract_interpacket_distribution.load_from_disk(verbose=True)
+    
     logger_flow.info("Reading distributions from the disk....")
-    pd_all_flows = extract_interpacket_distribution.load_from_disk(verbose=False)
-    logger_flow.debug("\t\t> "+ str(len(pd_all_flows)) + " devAddrs in the disk")
-    nb_records_unfiltered = len(pd_all_flows)
+    if pd_all_flows == None:
+        logger_flow.error("\t\t>0 devAddrs in the disk")
+        logger_flow.error("Nothing to read -> stop the analysis here")
+        exit(0)
+    else:
+        logger_flow.debug("\t\t> "+ str(len(pd_all_flows)) + " devAddrs in the disk")
+        nb_records_unfiltered = len(pd_all_flows)
 
     
     #filtering

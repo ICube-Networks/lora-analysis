@@ -127,6 +127,7 @@ def es_query_get_devAddr():
                 }
             }
         )
+        print(response)
         
         # for the next page
         pagination_count = pagination_count + 1

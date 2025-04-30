@@ -51,7 +51,7 @@ import logging
 LOGGER = logging.getLogger('dataset_decodeFrames')
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
-logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
+logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 
 #parameters
@@ -104,12 +104,12 @@ if __name__ == "__main__":
                         }
                     }
                 }
-            },
+            }#,
             #sort them chronologically (just because it's convenient for debuging)
-            sort=[
-                    {"mqtt_time": {"order": "asc"}},
-                    {"_score": {"order": "desc"}},
-            ]
+            #sort=[
+            #        {"mqtt_time": {"order": "asc"}},
+            #        {"_score": {"order": "desc"}},
+            #]
         )
 
         # num of records
@@ -120,8 +120,8 @@ if __name__ == "__main__":
             break
         
         #extracts the mqtt-time of the last element to then scroll later
-        last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
-        LOGGER.info("       > " + str(last_record))
+        #last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
+        LOGGER.info("       > " + str(length) + " records")
 
         # reinit the next bulk update query
         bulk_update = []
