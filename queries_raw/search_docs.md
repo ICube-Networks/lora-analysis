@@ -134,7 +134,7 @@ GET /lora-index/_search?pretty=true
 ```
 	
 	 
-# a PhyPayload without tx_info
+# a PhyPayload without extra_infos
 
 ```
 GET /lora-index/_search?pretty=true
@@ -144,7 +144,7 @@ GET /lora-index/_search?pretty=true
 	  "query": {
 	    "bool": {
 	      "must_not": [
-          {"exists": {"field": "txInfo"}}
+          {"exists": {"field": "extra_infos"}}
         ]
       }
 	  },
@@ -190,3 +190,19 @@ GET /lora-index/_search?pretty=true
 ```
 	
 	
+# comptage
+
+* NB de paquets sans dup_info
+
+```
+GET /lora-index/_count?pretty=true
+	{
+	  "query": {
+	    "bool": {
+	      "must_not": [
+          {"exists": {"field": "dup_infos"}}
+        ]        
+      }
+	}
+}
+```

@@ -59,3 +59,18 @@ to get the number of records for which the frame has not been decoded (the recor
 	}
 
 ```
+
+
+# Parameters
+
+* to change the default timeout value
+
+```
+
+PUT _cluster/settings
+{
+  "persistent": {
+    "search.default_search_timeout": "60s"
+  }
+}
+```
