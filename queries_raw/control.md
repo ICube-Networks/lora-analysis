@@ -1,6 +1,22 @@
 # Progress
 
-to get the number of records for which the frame has not been decoded (the records are modified through `dataset_addfields.py`)
+	
+* NB de paquets sans dup_info
+
+```
+GET /lora-index/_count?pretty=true
+	{
+	  "query": {
+	    "bool": {
+	      "must_not": [
+          {"exists": {"field": "dup_infos"}}
+        ]        
+      }
+	}
+}
+```
+
+* to get the number of records for which the frame has not been decoded (the records are modified through `dataset_addfields.py`)
 
 ```
 
@@ -28,6 +44,28 @@ to get the number of records for which the frame has not been decoded (the recor
 	  }
 	}
 ```
+
+
+* a doc with a given payload and no dup
+
+```
+GET /lora-index/_search?pretty=true
+{
+    "size": 10000,
+	"timeout": "3000s",
+	"query": {
+		"bool": {
+            "filter" : [
+                {"match": {"phyPayload": "gMvWowQAfwECzs5nB4lyjw=="}}
+            ],
+	        "must_not": [
+                {"exists": {"field": "dup_infos"}}
+            ]
+        }
+	}
+}
+```
+
 
 # number of docs after a given date
 

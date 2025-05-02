@@ -55,7 +55,7 @@ import cProfile
 # parameters
 DUP_INFO_VERSION = "1.0"
 OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the time window), number of minutes
-
+TIME_MIN_ABSOLUTE = "2000-01-01T00:00:00.353577Z"
 
 
 ############################################################
@@ -169,8 +169,8 @@ def get_smallest_phyPayload():
         fields=[
             "phyPayload"
         ],
-        #sort payload and chronologically (smallest non processed time of the smallest payload)
-        sort=["phyPayload.keyword"]
+        #no sort
+        sort=["_doc"]
     )
     
     clientES.transport.close()
@@ -187,7 +187,15 @@ def get_smallest_phyPayload():
 #return all the packets with the corresponding payload, and a larger MQTT TIME
 def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
     # to detect all the duplicates, shift the mqtt_time_min in the past!
-    mqtt_time_min = (datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min, tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH))
+    
+   
+    
+    
+    mqtt_time_min = (datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
+
+    
+
+
 
     #all the fields for THIS payload, ranked by the mqtt_time
     response = clientES.search(
@@ -232,97 +240,50 @@ if __name__ == "__main__":
     #connections
     clientES = tools.elasticsearch_open_connection()
   
-    # retrieve the earliest entry not handled
-    phyPayload_min = get_smallest_phyPayload()
-        
-    # no frame to be processed: all of them have a dup_infos field with the right version number
-    if phyPayload_min is None:
-        LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
-        exit(0)
-
  
+
     # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
+    # Process per phyPayload
     while True:
+         
+        # retrieve the earliest entry not handled
+        phyPayload_min = get_smallest_phyPayload()
+        
+        # no frame to be processed: all of them have a dup_infos field with the right version number
+        if phyPayload_min is None:
+            LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
+            exit(0)
          
         #info
         LOGGER.info("\t> phyPayload_min=" + phyPayload_min)
 
-        # Search and Sort the entries chronologically
-        # MUST include the records already flagged dup or not
-        # Else, it's impossible to detect duplicates between those handled and those not handled)
-        # NB: minpayload is saved at the end of the while loop for the next query
-        response = clientES.search(
-            index=myconfig.index_name,
-            size=tools.queries.QUERY_NB_RESULT,
-            query={
-                "bool": {
-                    "must" : [{
-                        "range": {
-                            "phyPayload.keyword": {
-                                "gte": phyPayload_min
-                            }
-                        }
-                    }]
-                }
-            },
-            pretty=True,
-            human=True,
-            #sort them by payload and chronologically
-            sort=["phyPayload.keyword", "mqtt_time"],
-        )
+        # earliest mqtt_time (2000 year by default)
+        mqtt_time_min = TIME_MIN_ABSOLUTE
  
-        # ------ 2 scenarios --------
-        # 1) different payloads in the response
-        # OR
-        # 2) same payload for all the response
-            
-        # scenario 1 by default
-        same_payload_in_the_response = False
-
-        # Scenario 2: if all the results own to the same payload, split the query with its mqtt_time
-        if len(response['hits']['hits']) == tools.queries.QUERY_NB_RESULT and response['hits']['hits'][0]['_source']['phyPayload'] == response['hits']['hits'][-1]['_source']['phyPayload']:
-            same_payload_in_the_response = True
-            
-            # all the packets have the same payload -> pick the lowest mqtt time
-            mqtt_time_min = response['hits']['hits'][0]['_source']['mqtt_time']
-
-         
+        
+        # for each phyPayload, process per mqtt_time
         while True:
-    
-            # Scenario 2: if all the results own to the same payload, split the query with its mqtt_time
-            if same_payload_in_the_response is True:
-                LOGGER.info("\t> split, mqtt_time_min=" + mqtt_time_min)
-                result = get_packets_with_payload_mqtt_min(phyPayload_min, mqtt_time_min)
+            LOGGER.info("\t\t> mqtt_time_min=" + mqtt_time_min)
 
-    
-            #no remaining response -> return in the main loop
-            if (len(response['hits']['hits']) == 0):
-                LOGGER.info("\tNo more packets to process in the dataset")
-                break
+            response = get_packets_with_payload_mqtt_min(phyPayload_min, mqtt_time_min)
  
             # add the is_duplicate field to each entry of this response
             bulk_update = create_updated_entries(response['hits']['hits'])
 
             #push the update
             if len(bulk_update) > 0 :
-                LOGGER.info("\tPush the update to the server ("+ str(len(bulk_update))+" records)")
+                LOGGER.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_min + ")")
                 tools.elasticsearch_push_updates(bulk_update)
-                LOGGER.info("\t... pushed")
+                LOGGER.info("\t\t... pushed")
             else:
-                LOGGER.info("\tNo update in this window (" + phyPayload_min + ")")
+                LOGGER.info("\t\tNo update in this window (" + phyPayload_min + ")")
 
-            
-            # next query -> next payload to processs
-            # holds for scenario 1: next query of the main loop
-            # AND scenario 2: next subloop (same payload) or next loop (different payload)
-            phyPayload_min = response['hits']['hits'][-1]['_source']['phyPayload']
-             
-            # scenario 1 -> nothing else to to, stop here for this payload (main loop)
-            if same_payload_in_the_response is not True:
-                LOGGER.info("\t> next payload")
+            #no remaining response -> return in the main loop
+            if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
+                LOGGER.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_min)
                 break
-        
-            # scenario 2 -> continue with the rest of the packets with the same payload (subloop)
+
+            # next min mqtt time
             mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
 
         

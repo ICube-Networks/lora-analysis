@@ -234,20 +234,3 @@ GET /lora-index/_search?pretty=true
 	}
 ```
 	
-	
-# comptage
-
-* NB de paquets sans dup_info
-
-```
-GET /lora-index/_count?pretty=true
-	{
-	  "query": {
-	    "bool": {
-	      "must_not": [
-          {"exists": {"field": "dup_infos"}}
-        ]        
-      }
-	}
-}
-```
