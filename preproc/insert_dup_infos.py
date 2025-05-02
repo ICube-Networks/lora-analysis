@@ -184,8 +184,10 @@ def get_smallest_phyPayload():
 
 
 
-#return all the packets with the corresponding payload, and a larger PQTT TIME
+#return all the packets with the corresponding payload, and a larger MQTT TIME
 def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
+    # to detect all the duplicates, shift the mqtt_time_min in the past!
+    mqtt_time_min = (datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min, tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
 
     #all the fields for THIS payload, ranked by the mqtt_time
     response = clientES.search(
@@ -238,9 +240,7 @@ if __name__ == "__main__":
         LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
         exit(0)
 
-    # to detect all the duplicates, shift the mqtt_time_min in the past!
-    #min_value['mqtt_time'] = (datetime.strptime(tools.time.fixMicroseconds(min_value['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
-
+ 
     # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
     while True:
          
