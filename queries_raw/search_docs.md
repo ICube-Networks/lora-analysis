@@ -52,6 +52,52 @@ To get an entry with its Phy payload
 
 
 
+# no-dup crawling
+
+
+* one phyPayload without dup_info
+
+```
+GET /lora-index/_search?pretty=true
+{
+	"size": 1,
+    "query": {
+        "bool": {
+            "must_not" : [{
+                "range": {
+                    "dup_infos.version": {
+                        "gte": "1.0"
+                    }
+                }
+            }]
+        }
+    },
+    "fields" :[
+        "phyPayload"
+    ],
+    
+}
+```
+
+* all the packets with this phyPayload
+
+```
+GET /lora-index/_search?pretty=true
+{
+    "size": 10000,
+	"timeout": "3000s",
+	"query": {
+		"bool": {
+            "filter" : [{
+                "match": {"phyPayload": "AQM3gJ0bNzcAEkEQCAAA"}
+            }] 
+        }
+	}
+}
+```
+
+
+
 
 # phypayload + mqtt_time min
 
@@ -113,24 +159,23 @@ GET /lora-index/_search?pretty=true
 # a PhyPayload without dup_info
 
 ```
-GET /lora-index/_search?pretty=true
-	{
-	 "size": 2000,
-	  "query": {
-	    "bool": {
-	      "must_not": [
-          {"exists": {"field": "dup_infos"}}
-        ],
-        "filter": [ 
-          { "match":  { "phyPayload": "+0EPOH56oFbkkTeqvTKO6MVUrYoZ"}}
-        ]
-      }
-	  },
-      "sort" : [
-        { "mqtt_time" : "asc" }
-      ]
-	}
-	
+GET /lora-index/_search?pretty=true&_source=false
+{
+	"size": 1,
+    "query": {
+        "bool": {
+            "must_not" : [
+                {"range": { "dup_infos.version": { "gte": "1.0" } } }
+           ]
+        }
+    },
+    "fields" :[
+        "phyPayload"
+    ],
+    "sort":[
+        "phyPayload.keyword"
+    ]
+}	
 ```
 	
 	 
