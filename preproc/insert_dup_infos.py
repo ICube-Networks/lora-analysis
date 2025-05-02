@@ -295,7 +295,7 @@ if __name__ == "__main__":
                 result = get_packets_with_payload_mqtt_min(phyPayload_min, mqtt_time_min)
 
     
-            #no remaining response -> return in the main loop 
+            #no remaining response -> return in the main loop
             if (len(response['hits']['hits']) == 0):
                 LOGGER.info("\tNo more packets to process in the dataset")
                 break
@@ -306,7 +306,7 @@ if __name__ == "__main__":
             #push the update
             if len(bulk_update) > 0 :
                 LOGGER.info("\tPush the update to the server ("+ str(len(bulk_update))+" records)")
-                #tools.elasticsearch_push_updates(bulk_update)
+                tools.elasticsearch_push_updates(bulk_update)
                 LOGGER.info("\t... pushed")
             else:
                 LOGGER.info("\tNo update in this window (" + phyPayload_min + ")")
