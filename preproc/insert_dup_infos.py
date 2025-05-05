@@ -265,7 +265,7 @@ if __name__ == "__main__":
             if len(bulk_update) > 0 :
                 LOGGER.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_min_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
                 tools.elasticsearch_push_updates(bulk_update)
-                LOGGER.info("\t\t... pushed (" + str() + " records)"
+                LOGGER.info("\t\t... pushed ")
             else:
                 LOGGER.info("\t\tNo update in this window (" + phyPayload_min_info['phyPayload'] + ")")
                 
