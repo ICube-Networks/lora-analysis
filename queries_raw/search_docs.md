@@ -232,5 +232,28 @@ GET /lora-index/_search?pretty=true
         { "mqtt_time" : "asc" }
       ]
 	}
+	
 ```
 	
+	
+# Phypayload and date
+
+```
+GET /lora-index/_search?pretty=true
+{
+    "size": 10000,
+	"timeout": "3000s",
+	"query": {		
+		"bool": {
+            "must" : [
+                {"match": {"phyPayload": "ALSSkTUnCNIMly0D/v9YF6jdJmlLtPg"}},
+				{"range":{
+	            	"mqtt_time":{
+	                	"gte": "2021-03-25T20:48:13.590911Z"
+	            	}
+				}}
+            ]            
+        }		
+	}
+}
+```
