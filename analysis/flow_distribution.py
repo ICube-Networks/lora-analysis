@@ -301,9 +301,10 @@ if __name__ == "__main__":
     # ---- disk -----
     # load data that is on the disk (already read previously)
     pd_all_flows = extract_interpacket_distribution.load_from_disk(verbose=True)
+    print(pd_all_flows)
     
     logger_flow.info("Reading distributions from the disk....")
-    if pd_all_flows == None:
+    if pd_all_flows.empty:
         logger_flow.error("\t\t>0 devAddrs in the disk")
         logger_flow.error("Nothing to read -> stop the analysis here")
         exit(0)
@@ -323,7 +324,6 @@ if __name__ == "__main__":
     
     #link qualities
     plot_link_quality_distrib(pd_all_flows)
-
     
     # plot a grid of distributions (invidividual analysis)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
@@ -348,7 +348,6 @@ if __name__ == "__main__":
         figname="figures/flow_distribution_duration.pdf",
         xlabel="Flow duration"
     )
-
 
     #correlation between inter pkt time / nb packets
     plot_interpkt_nbpkts(pd_all_flows)

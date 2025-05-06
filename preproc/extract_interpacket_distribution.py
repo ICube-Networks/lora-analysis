@@ -127,8 +127,7 @@ def es_query_get_devAddr():
                 }
             }
         )
-        print(response)
-        
+          
         # for the next page
         pagination_count = pagination_count + 1
         
@@ -372,8 +371,6 @@ def eq_query_get_interpkt(devAddr):
     #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
     #    print(flows_for_thisDevAddr[0]['pd_distrib'])
 
-    #print("----------")
-    #print(flows_for_thisDevAddr[1]['pd_distrib'])
 
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
@@ -387,16 +384,13 @@ def eq_query_get_interpkt(devAddr):
         # the individual values are not anymore useful
         del(flow['pd_distrib'])
 
-        #print( "size=" + str(flow['pd_distrib']['interpkt_time_ms'].size + 1) + " nbPkts="+ str(record['nb_pkts'])+ " fCnt_1st="+ str(record['fCnt_1st'])+ " devAddr="+ str(record['devAddr']))
-        
+         
         #add this flow to the list of flows for this devAddr
         if 'pd_these_flows' not in locals():
             pd_these_flows = pd.DataFrame(data=record_summary)
         else:
             pd_these_flows = pd.concat([pd_these_flows, pd.DataFrame(data=record_summary)], ignore_index=True)
-            
-        #print(pd_these_flows)
-
+  
 
     if 'pd_these_flows' not in locals():
         logger_preprocflow.error("No flow for the devAddr " + str(devAddr))
@@ -422,10 +416,9 @@ def load_from_disk(verbose=False):
 
     
     """
-    pd_all_flows = None
-
+ 
     if verbose:
-        logger_preprocflow.info("Loading parquet data from " + FILENAME_DF + ":")
+        logger_preprocflow.info("Loading parquet data from " + FILENAME_DF + " :")
         logger_preprocflow.info("\t> Reading values ....")
 
     if  os.path.exists(FILENAME_DF):
@@ -435,6 +428,7 @@ def load_from_disk(verbose=False):
         pd_all_flows['nb_pkts'] = pd_all_flows['nb_pkts'].astype('int')
     else:
         logger_preprocflow.info(FILENAME_DF + " doesn't exist.")
+        pd_all_flows = pd.DataFrame({'empty' : []})
 
 
     return(pd_all_flows)
