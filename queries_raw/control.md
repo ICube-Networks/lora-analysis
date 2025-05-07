@@ -2,6 +2,7 @@
 
 	
 * NB de paquets sans dup_info
+  * API `_count` et non `_search` 
 
 ```
 GET /lora-index/_count?pretty=true

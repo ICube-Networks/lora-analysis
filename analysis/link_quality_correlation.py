@@ -49,7 +49,7 @@ logging.basicConfig(stream=sys.stdout)
 
 
 #variables
-NUMPACKETS_MAX = 100
+NUMPACKETS_MAX = 10000
 
 
 def  es_query_packets():

@@ -36,7 +36,9 @@ from elasticsearch.helpers import parallel_bulk
 #logs
 import logging
 logger_tool = logging.getLogger('tools')
-logger_tool.setLevel(logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
+
 
 
 
@@ -75,6 +77,9 @@ def elasticsearch_walk_aggrep(es_reply, agg_names, depth, results_df, tuple, fie
         key = "key_as_string"
     else:
         key = "key"
+    
+    
+  
     
     #last recursive call, save the value (doc_count) in the tuple, and push the tuple into the dataframe
     if(depth == len(agg_names)):
