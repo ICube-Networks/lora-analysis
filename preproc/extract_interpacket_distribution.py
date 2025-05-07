@@ -72,7 +72,6 @@ FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the file
 # conditions for a new flow
 DELTA_FCNT_ABS_MAX = 100              # absolute diff: if the counter diff exceeds DELTA
 DELTA_INTERPKT_ABS_TIME_MAX = 60480000000  # if the inter-packet time exceeds 1 day (epoch in ms), 7 days
-#DELTA_INTERPKT_REL_TIME_MAX = 3      # if the inter-packet time exceeds DELTA * max
 
 #
 
@@ -127,6 +126,7 @@ def es_query_get_devAddr():
                 }
             }
         )
+        #print(response)
           
         # for the next page
         pagination_count = pagination_count + 1
@@ -323,7 +323,7 @@ def eq_query_get_interpkt(devAddr):
 
                         # create a pandas record at the end of the distrib
                         flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
-                            time_difference_ms,
+                            time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
                             fCnt_difference,
                             fCnt_current,
                             datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
@@ -562,15 +562,13 @@ class Application:
                     
         """
 
-
-   
         #get the list of devaddrs in the elastic search DB
         list_devAddr_pending = es_query_get_devAddr()
+        #print(list_devAddr_pending)
         
         # empty pandas dataframe (none read from the disk) -> let's create it
-        if self.pd_all_flows is  None:
+        if self.pd_all_flows.empty is True:
             self.pd_all_flows = pd.DataFrame({'devAddr': [], 'fCnt_1st': [], 'fCnt_last': [], 'time_1st': [], 'time_last': [], 'median_interpkt_time_ms': [], 'max_interpkt_time_ms': [], 'min_interpkt_time_ms': [], 'nb_pkts': []})
-            
 
         # Else, some have already been extracted from the disk
         # remove from the pending list the devAddr already handled
@@ -592,7 +590,7 @@ class Application:
 
 
         #get the inter packet times for a given devAddr
-        logger_preprocflow.info("> Reading new values in Elastic Search ....")
+        logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(list_devAddr_pending)) +" )")
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
         for devAddr in list_devAddr_pending :
 

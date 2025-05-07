@@ -36,7 +36,7 @@ from elasticsearch.helpers import parallel_bulk
 #logs
 import logging
 logger_tool = logging.getLogger('tools')
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
 logging.getLogger('elastic_transport.transport').setLevel(logging.WARNING)
 
 
