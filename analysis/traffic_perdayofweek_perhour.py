@@ -105,9 +105,9 @@ def es_query_traffic_per_dayofweek(clientES):
     results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("day_of_week", "date-day"), key_as_string=False,)
  
     #mapping to sort with the day of week
-    results_df["day_of_week"] = pd.Categorical(results_df["day_of_week"], tools.dayofweek.long[:len(tools.dayofweek.long)])
+    results_df["day_of_week"] = pd.Categorical(results_df["day_of_week"], tools.dayofweek.short[:len(tools.dayofweek.short)])
     results_df = results_df.sort_values("day_of_week")
-
+ 
 
     return(results_df)
     
@@ -127,7 +127,7 @@ def plot_traffic_per_dayofweek(clientES):
 
     #result
     results_df = es_query_traffic_per_dayofweek(clientES)
-    print(results_df)
+
 
     # Create a seaborn visualization
     sns.set(font_scale=2.0)
@@ -198,7 +198,7 @@ def es_query_traffic_per_hour(clientES):
             }
         }
     )
-   # print(resp)
+    #print(resp)
     
     # transform the aggregation results into a pandas' dataframe
     results_df = tools.elasticsearch_agg_into_dataframe(es_reply= resp, agg_names=("hour", "date-day"), key_as_string=False,)
