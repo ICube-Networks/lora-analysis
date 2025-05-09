@@ -44,9 +44,13 @@ import flask
 
 #logs
 import logging
-LOGGER = logging.getLogger('dataset_flag_duplicates')
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
+logger_dup = logging.getLogger('dupinfo')
+#logger_dup.basicConfig(stream=sys.stdout, level=logging.INFO)
+logger_dup.setLevel(logging.INFO)
+logging.basicConfig(stream=sys.stdout)
+
+# debug of the ES connection
+#logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 
 #profiling
@@ -77,15 +81,15 @@ def create_updated_entries(response):
         diff_time = datetime.strptime(tools.time.fixMicroseconds(response[-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(tools.time.fixMicroseconds(response[0]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
         
         if (diff_time <= timedelta(minutes = OFFSET_MINUTES_MAX)):
-            LOGGER.critical("The time difference for phyPayload "+   + " is equal to " + str(diff_time))
-            LOGGER.critical("We may miss some duplicates -> let's top here")
+            logger_dup.critical("The time difference for phyPayload "+   + " is equal to " + str(diff_time))
+            logger_dup.critical("We may miss some duplicates -> let's top here")
             exit(4)
 
     
     found = False   # used only for index=1, else, it is handled in the tests
     previous_id = 0
     for index in range(len(response)):
-        LOGGER.debug("_id=" + response[index]['_id'])
+        logger_dup.debug("_id=" + response[index]['_id'])
         
         if index >= 1:
             # Same info (NB: the recorded are sorted by <phyPayload, mqtt_time>
@@ -97,10 +101,10 @@ def create_updated_entries(response):
                     diff_time = datetime.strptime(tools.time.fixMicroseconds(response[index]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH) - datetime.strptime(tools.time.fixMicroseconds(response[index-1]['_source']['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH)
                     
                 except Exception as e :
-                    LOGGER.critical("An error occured when parsing the response -> "+ str(e))
-                    LOGGER.critical("response:")
-                    LOGGER.critical(json.dumps(response, sort_keys=True, indent=4))
-                    LOGGER.critical("index: " + str(index) + " id="+ response[index]['_id'])
+                    logger_dup.critical("An error occured when parsing the response -> "+ str(e))
+                    logger_dup.critical("response:")
+                    logger_dup.critical(json.dumps(response, sort_keys=True, indent=4))
+                    logger_dup.critical("index: " + str(index) + " id="+ response[index]['_id'])
                     exit(7)
 
                 # this is a duplicate only if time diff acceptable + same PHY info
@@ -129,7 +133,7 @@ def create_updated_entries(response):
         req_update['_index']       = myconfig.index_name
         req_update['_id']          = response[index]['_id']
         req_update['dup_infos']    = dup_infos
-        LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+        logger_dup.debug(json.dumps(req_update, sort_keys=True, indent=4))
          
         # insert this update to the current sequence
         bulk_update.append(req_update)
@@ -150,6 +154,7 @@ def get_smallest_phyPayload():
     response = clientES.search(
         index=myconfig.index_name,
         size=1,
+        request_cache=False,
         query={
             "bool": {
                 "must_not" : [{
@@ -169,6 +174,8 @@ def get_smallest_phyPayload():
     )
     
     clientES.transport.close()
+
+    print(response)
 
     # result
     if response['hits']['total']['value'] == 0:
@@ -244,37 +251,39 @@ if __name__ == "__main__":
         
         # no frame to be processed: all of them have a dup_infos field with the right version number
         if phyPayload_min_info is None:
-            LOGGER.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
+            logger_dup.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
             exit(0)
          
         #info
-        LOGGER.info("\t> phyPayload_min=" + phyPayload_min_info['phyPayload'])
+        logger_dup.info("\t> phyPayload_min=" + phyPayload_min_info['phyPayload'])
 
         # earliest mqtt_time (2000 year by default)
         mqtt_time_min = phyPayload_min_info['mqtt_time']
- 
         
         # for each phyPayload, process per mqtt_time
         while True:
             response = get_packets_with_payload_mqtt_min(phyPayload_min_info['phyPayload'], mqtt_time_min)
+            with open("resp.txt", "w") as f:
+                f.write(json.dumps(response['hits'], sort_keys=True, indent=4))
+            f.close()
  
             # add the is_duplicate field to each entry of this response
             bulk_update = create_updated_entries(response['hits']['hits'])
 
             #push the update
             if len(bulk_update) > 0 :
-                LOGGER.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_min_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
+                logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_min_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
                 tools.elasticsearch_push_updates(bulk_update)
-                LOGGER.info("\t\t... pushed ")
+                logger_dup.info("\t\t... pushed ")
             else:
-                LOGGER.info("\t\tNo update in this window (" + phyPayload_min_info['phyPayload'] + ")")
+                logger_dup.info("\t\tNo update in this window (" + phyPayload_min_info['phyPayload'] + ")")
                 
             # garbage collector
             del bulk_update[:]
 
             #no remaining response -> return in the main loop
             if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
-                LOGGER.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_min_info['phyPayload'])
+                logger_dup.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_min_info['phyPayload'])
                 break
 
             # next min mqtt time

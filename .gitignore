@@ -192,3 +192,4 @@ analysis/figures/*
 lora-tools/
 parser/tmp
 config/myconfig.py.old
+preproc/resp.txt
