@@ -263,10 +263,7 @@ if __name__ == "__main__":
         # for each phyPayload, process per mqtt_time
         while True:
             response = get_packets_with_payload_mqtt_min(phyPayload_min_info['phyPayload'], mqtt_time_min)
-            with open("resp.txt", "w") as f:
-                f.write(json.dumps(response['hits'], sort_keys=True, indent=4))
-            f.close()
- 
+           
             # add the is_duplicate field to each entry of this response
             bulk_update = create_updated_entries(response['hits']['hits'])
 
@@ -279,7 +276,7 @@ if __name__ == "__main__":
                 logger_dup.info("\t\tNo update in this window (" + phyPayload_min_info['phyPayload'] + ")")
                 
             # garbage collector
-            del bulk_update[:]
+            #del bulk_update[:]
 
             #no remaining response -> return in the main loop
             if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
