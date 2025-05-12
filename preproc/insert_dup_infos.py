@@ -50,7 +50,7 @@ logger_dup.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
-#logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
+logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 
 #profiling
@@ -143,9 +143,10 @@ def create_updated_entries(response):
 
 
 
-def get_smallest_phyPayload():
+def get_nodupinfo_phyPayload(payload_handled):
     """
-    Returns the smallest (alphabetically) phyPayload in the dataset that has no dup_info field, and its mqtt_time
+    Returns one phyPayload in the dataset that has no dup_info field different from "payload_handled"
+    and its mqtt_time
   
     """
     
@@ -157,25 +158,26 @@ def get_smallest_phyPayload():
         request_cache=False,
         query={
             "bool": {
-                "must_not" : [{
-                    "range": {
+                "must_not" : [
+                    {"range": {
                         "dup_infos.version": {
                             "gte": DUP_INFO_VERSION
                         }
-                    }
-                }]
+                    }},
+                    {"match": {"phyPayload": payload_handled}}
+                ]
             }
         },
         fields=[
             "phyPayload"
         ],
         #no sort
-        sort=["_doc"]
+        sort=["mqtt_time"],
+        #sort=["_doc"]
     )
     
     clientES.transport.close()
-
-    print(response)
+    #print(response)
 
     # result
     if response['hits']['total']['value'] == 0:
@@ -239,7 +241,8 @@ if __name__ == "__main__":
     
     #connections
     clientES = tools.elasticsearch_open_connection()
-  
+    phyPayload_min_info = {}
+    phyPayload_min_info['phyPayload'] = ''
  
 
     # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
@@ -247,7 +250,7 @@ if __name__ == "__main__":
     while True:
          
         # retrieve the earliest entry not handled
-        phyPayload_min_info = get_smallest_phyPayload()
+        phyPayload_min_info = get_nodupinfo_phyPayload(phyPayload_min_info['phyPayload'])
         
         # no frame to be processed: all of them have a dup_infos field with the right version number
         if phyPayload_min_info is None:
