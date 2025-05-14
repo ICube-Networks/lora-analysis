@@ -52,12 +52,10 @@ logging.basicConfig(stream=sys.stdout)
 NUMPACKETS_MAX = 10000
 
 
-def  es_query_packets():
-    """Elastic search query for an histogram.
+def  es_query_packets_list_random():
+    """Elastic search query for a list of packets.
     
     This function sends a query to an elastic search server  to retrieve a bunch of packets, randomly picked in the dataset
-    
-    :param Elasticsearch clientES: a connection to an elastic search server
     
     :returns: a pandas DataFrame which contains at most NUMPACKETS_MAX packets
     :rtype: DataFrame
@@ -196,8 +194,10 @@ if __name__ == "__main__":
  
     """
     
+    # ------  PAIR PLOT ------
+    
     #elastic search query, transformed in a panda dataFrame
-    results_df = es_query_packets()
+    results_df = es_query_packets_list_random()
     # remove outliers
     results_df = results_df[results_df['rssi'] < 0]
     logger_quality_corr.info(results_df)
@@ -205,8 +205,3 @@ if __name__ == "__main__":
     #plot it
     plot_SF_SNR_RSSI(results_df)
     
-
-    #link quality for each flow
-    
-
-

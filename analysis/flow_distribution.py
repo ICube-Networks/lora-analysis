@@ -224,7 +224,6 @@ def plot_link_quality_distrib(pd_all_flows):
     
     """
     logger_flow.info("Plot the distribution of the PRR for all flows")
-
     
     sns.set()
     sns.set_theme(style='whitegrid')
@@ -245,6 +244,7 @@ def plot_link_quality_distrib(pd_all_flows):
     g.figure.savefig("figures/flow_distribution_mean_prr.pdf")
     g.figure.clf()
          
+
          
 
 
@@ -318,6 +318,16 @@ if __name__ == "__main__":
     logger_flow.debug("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
     
+    
+    
+    
+    print(pd_all_flows.iloc[0])
+    res = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(pd_all_flows.iloc[0]['devAddr'],  pd_all_flows.iloc[0]['time_1st'])
+
+    #load_distribs_forDevAddr_from_disk(pd_all_flows, "00000000")
+    print(res.to_string())
+    exit(97)
+    
  
 
     # --- plots ---
@@ -325,7 +335,7 @@ if __name__ == "__main__":
     #link qualities
     plot_link_quality_distrib(pd_all_flows)
     
-    # plot a grid of distributions (invidividual analysis)
+    # plot a grid of distributions (randomly selected flows)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
     nb_cols = math.ceil(math.sqrt(nb_plots))
     plot_list = random.choices(range(0,len(pd_all_flows)-1), k=nb_plots)

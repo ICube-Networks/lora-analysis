@@ -63,17 +63,17 @@ import time
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 
-AGG_OFFSET = 1000                   # offset for the pagination in the aggregatied query
+AGG_OFFSET = 2000                   # offset for the pagination in the aggregated query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
 FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file to read/write the data frames
 FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the filenames for the distribution
 
 # conditions for a new flow
-DELTA_FCNT_ABS_MAX = 100              # absolute diff: if the counter diff exceeds DELTA
-DELTA_INTERPKT_ABS_TIME_MAX = 60480000000  # if the inter-packet time exceeds 1 day (epoch in ms), 7 days
+DELTA_FCNT_ABS_MAX = 10000              # absolute diff: if the counter diff exceeds DELTA
+DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # 7 days
 
-#
+
 
 
 # --------------------------------------------------------
@@ -169,7 +169,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'median_interpkt_time_ms': pd_distrib['interpkt_time_ms'].median(),
             'max_interpkt_time_ms': pd_distrib['interpkt_time_ms'].max(),
             'min_interpkt_time_ms': pd_distrib['interpkt_time_ms'].min(),
-            'nb_pkts': [pd_distrib['interpkt_time_ms'].size + 1,],         # number of packets = length of the list + one
+            'nb_pkts': [pd_distrib['interpkt_time_ms'].size,],         # number of packets = length of the list
         }
     else:
         record = {
@@ -184,7 +184,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'median_interpkt_time_ms': [pd.NaT,],
             'max_interpkt_time_ms': [pd.NaT,],
             'min_interpkt_time_ms': [pd.NaT,],
-            'nb_pkts': [pd_distrib['interpkt_time_ms'].size + 1,] ,        # number of packets = length of the list + one
+            'nb_pkts': [pd_distrib['interpkt_time_ms'].size,] ,        # number of packets = length of the list
        }
     
     return(record)
@@ -299,40 +299,36 @@ def eq_query_get_interpkt(devAddr):
             #search for an active flow to which the current packet may correspond
             for flow in flows_for_thisDevAddr:
                 time_difference_ms = time_current - flow['epochtime_last']
+                fCnt_difference = fCnt_current - flow['fCnt_last']
                 
+   
                 # is it same flow ?
-                # 1nd condition: the time between two packets does not exceed a given DELTA value
-                #the sorting field is the mqtt_time (in epoch format)
-                #diff_time = response["hits"]["hits"][i]["sort"][0] - flow['time_last']
-                if (time_difference_ms <=  DELTA_INTERPKT_ABS_TIME_MAX):
-                  
-                    #frame counter difference
-                    fCnt_difference = fCnt_current - flow['fCnt_last']
-                   
-                    # 2nd condition: the different for the sequence number does not exceed a given DELTA value
-                    if  1 <= fCnt_difference < DELTA_FCNT_ABS_MAX:
-
-                        # ok, this packet corresponds to the flow
-                        found = True
-                                          
-                        # update the current fcnt value for this flow (this is my new reference for this flow)
-                        flow['fCnt_last'] = max(flow['fCnt_last'], fCnt_current)
-                        flow['epochtime_last'] = time_current
-                        flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
+                # 1st condition: the difference for the sequence number does not exceed a given DELTA value
+                # 2nd condition: the time between two packets does not exceed the max inter packet time X the max nb of missed packets
+                # 3rd condition: the time difference between two packets does not exceed MAX (= one week)
+                if (1 <= fCnt_difference < DELTA_FCNT_ABS_MAX) \
+                and ((flow['pd_distrib']['interpkt_time_ms'].max() == 0) or (flow['pd_distrib']['interpkt_time_ms'].max() * 2 >= time_difference_ms / fCnt_difference))\
+                and (0 < time_difference_ms < DELTA_INTERPKT_ABS_TIME_MAX) :
+                
+                    # ok, this packet corresponds to the flow
+                    found = True
+                                      
+                    # update info of this flow
+                    flow['epochtime_last'] = time_current
+                    flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
+                    flow['fCnt_last'] = flow['pd_distrib']['fCnt'].max()
 
 
-                        # create a pandas record at the end of the distrib
-                        flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
-                            time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
-                            fCnt_difference,
-                            fCnt_current,
-                            datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
-                            current_packet_data["fields"]["phyPayload"][0],
-                        ]
+                    # create a pandas record at the end of the distrib
+                    flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
+                        time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
+                        fCnt_difference,
+                        fCnt_current,
+                        datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                        current_packet_data["fields"]["phyPayload"][0],
+                    ]
 
-                        #if test > 200:
-                        #    exit(2)
-                        break  # exit loop since packet corresponds to the flow, no need to further iterate.
+                    break  # exit loop since packet corresponds to the flow, no need to further iterate.
             
 
             
@@ -374,7 +370,7 @@ def eq_query_get_interpkt(devAddr):
 
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
-
+ 
         #save the raw distribution (dataframe in a file)
         save_distrib_to_disk(pd_distrib=flow['pd_distrib'], devAddr=devAddr, time_1st=flow['time_1st'])
 
@@ -588,6 +584,7 @@ class Application:
                     logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
                     logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
 
+      
 
         #get the inter packet times for a given devAddr
         logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(list_devAddr_pending)) +" )")
@@ -596,6 +593,7 @@ class Application:
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
+            #print(pd_records.to_string())
             
             # concatenation to the global pandaframe
             if pd_records is not None :
@@ -665,6 +663,4 @@ if __name__ == "__main__":
     #    boug = boug + 1
     
  
-    
-    #exit(1)
- 
+   
