@@ -164,7 +164,7 @@ def get_nodupinfo_phyPayload(payload_handled):
                             "gte": DUP_INFO_VERSION
                         }
                     }},
-                    {"match": {"phyPayload": payload_handled}}
+                    {"term": {"phyPayload.keyword": payload_handled}}
                 ]
             }
         },

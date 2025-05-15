@@ -55,6 +55,9 @@ logger_preprocflow = logging.getLogger('interpkt_distribution')
 logger_preprocflow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
+# debug of the ES connection
+#logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
+
 # system
 import signal
 import time
@@ -213,9 +216,9 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
         query={
             "bool": {
                 "filter" : [
-                    {"match": {"dup_infos.is_duplicate": False}},
-                    {"match": {"extra_infos.phyPayload.mhdr.mType": "2"}},
-                    {"match": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
+                    {"term": {"dup_infos.is_duplicate": False}},
+                    {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
+                    {"term": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
                 ],
             }
         },
@@ -251,8 +254,34 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
     return(response, mqtt_time_min)
     
     
+def eq_query_get_dup_nb(doc_id):
+    """ Elastic query to get the number of duplicates for a specific packet
+        
+    :param the ES document id to count # of duplicates.
+        
+    :returns: the number of duplicates for this ES document
+    
+    :rtype: int
+    """
+    
+    #return(0)
+    
+    clientES = tools.elasticsearch_open_connection()
 
 
+    response = clientES.count(
+        index=myconfig.index_name,
+        query={
+            "bool": {
+                "must" : [
+                    {"term": {"dup_infos.copy_of.keyword": doc_id}}
+                ]
+            }
+        }
+    )
+
+    #-1 since I'm part of these records
+    return(response['count'] - 1)
 
 def eq_query_get_interpkt(devAddr):
     """ Elastic query to get the list of inter packet time for a given devAddr
@@ -317,13 +346,14 @@ def eq_query_get_interpkt(devAddr):
                     flow['epochtime_last'] = time_current
                     flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
                     flow['fCnt_last'] = flow['pd_distrib']['fCnt'].max()
-
+                    
 
                     # create a pandas record at the end of the distrib
                     flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
                         time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
                         fCnt_difference,
                         fCnt_current,
+                        eq_query_get_dup_nb(response["hits"]["hits"][i]["_id"]),
                         datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                         current_packet_data["fields"]["phyPayload"][0],
                     ]
@@ -339,6 +369,7 @@ def eq_query_get_interpkt(devAddr):
                     'interpkt_time_ms' : [0],
                     'fCnt_diff' : [0],
                     'fCnt' : [fCnt_current],
+                    'nb_duplicates': eq_query_get_dup_nb(response["hits"]["hits"][i]["_id"]),
                     'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
                     'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
                 }
@@ -589,6 +620,9 @@ class Application:
         #get the inter packet times for a given devAddr
         logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(list_devAddr_pending)) +" )")
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
+        
+        count_val = 0
+        
         for devAddr in list_devAddr_pending :
 
             # get the new record(s) for this devAddr (one record per flow)
@@ -608,7 +642,9 @@ class Application:
             else:
                 logger_preprocflow.info("\t" + devAddr + "\t0" )
 
-
+            count_val = count_val +1
+            if (count_val > 3):
+                break
  
             #exit condition
             if self.terminated:

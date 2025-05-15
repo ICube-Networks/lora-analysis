@@ -53,8 +53,7 @@ logger_flow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 
-    
-# read distributions from the disk
+# read distributions from the disk (preprocessed)
 import extract_interpacket_distribution
 
 
@@ -62,7 +61,8 @@ import extract_interpacket_distribution
 #parameters
 NB_PKTS_MIN = 50        # minimum number of packets for a given devAddr (else discarded) to compute the median value
 NB_PLOTS = 16           # number of plots for individual distributions
-INTERPKTIME_MAX = 10**4 # maxium interpacket time considered when plotting the correlation nbpkts / inter packet time
+
+
 
 
 # --------------------------------------------------------
@@ -223,8 +223,8 @@ def plot_interpkt_nbpkts(pd_all_flows):
 
 
 
-def plot_link_quality_distrib(pd_all_flows):
-    """ Plot the link quality distribution of flows
+def plot_PRR_distrib(pd_all_flows):
+    """ Plot the Packet Reception Rate distribution of flows
         
     :param distribution: a pandas dataframe with the data to plot
     
@@ -321,24 +321,22 @@ if __name__ == "__main__":
     
     #filtering
     pd_all_flows = pd_all_flows[pd_all_flows['nb_pkts'] >= NB_PKTS_MIN]
-    logger_flow.debug("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
+    logger_flow.info("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
 
-    print(pd_all_flows[pd_all_flows['devAddr'] == "0fd578a9"].to_string())
-
+    
 
 
 
     # --- plots ---
     
-    #link qualities
-    plot_link_quality_distrib(pd_all_flows)
+    #PRR (fcnt diff between consecutive packets)
+    plot_PRR_distrib(pd_all_flows)
     
     # plot a grid of distributions (randomly selected flows)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
     nb_cols = math.ceil(math.sqrt(nb_plots))
     plot_list = random.choices(range(0,len(pd_all_flows)-1), k=nb_plots)
-    print(plot_list)
     plot_interpkt_time_distribution_grid(pd_all_flows=pd_all_flows, plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
 
     #info
