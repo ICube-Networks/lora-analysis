@@ -270,43 +270,6 @@ def es_query_devaddr_duration(operator, field_scope, field_value):
     return(results_df)
  
     
-# distribution of the devaddr durations
-def plot_devaddr_duration():
-    """ Plot the distribution of durations.
-    
-    This function uses a pandas dataFrame to plot the distributions.
-        
-    """
-    
-    
-    #es query
-    results_df = es_query_devaddr_duration(operator="min", field_scope="extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword", field_value="mqtt_time")
-    #results_df["minmqtt_timeas_string"] = mdates.date2num(results_df["minmqtt_timeas_string"])
-    results_df["devaddr_duration"] = mdates.date2num(results_df["maxmqtt_timeas_string"]) - mdates.date2num(results_df["minmqtt_timeas_string"])
-    logger_devaddr.info(results_df)
-  
-    # Create a seaborn visualization
-    sns.set()
-    sns.set_theme()
-    g = sns.ecdfplot(
-        data=results_df,
-        x="devaddr_duration",
-    #    hue=str,
-    #    palette="tab10",   #only if hue specified
-    )
-    axes = g.axes
-    g.set(xlabel='Session Duration for each devAddr (in days)',)
-    
-    # formating dates -> not required since this is not a date but a difference (=duration)
-    #locator = mdates.AutoDateLocator()
-    #formatter = mdates.ConciseDateFormatter(locator)
-    #axes.xaxis.set_major_locator(locator)
-    #axes.xaxis.set_major_formatter(formatter)
-    
-    fig = g.figure.savefig('figures/devaddr_distrib_durations.pdf')
-    g.figure.clf()
-
-
 
 
 
@@ -317,8 +280,6 @@ if __name__ == "__main__":
  
     """
     
-    # duration of each devaddr
-    plot_devaddr_duration()
     
     #plot the number of packets per devAddr / devEUI
     plot_pkt_per_devaddr()
