@@ -60,8 +60,8 @@ import extract_interpacket_distribution
 
 
 #parameters
-NB_PKTS_MIN = 9        # minimum number of packets for a given devAddr (else discarded) to compute the median value
-NB_PLOTS = 9           # number of plots for individual distributions
+NB_PKTS_MIN = 50        # minimum number of packets for a given devAddr (else discarded) to compute the median value
+NB_PLOTS = 16           # number of plots for individual distributions
 INTERPKTIME_MAX = 10**4 # maxium interpacket time considered when plotting the correlation nbpkts / inter packet time
 
 
@@ -85,7 +85,7 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
     fig, axs = plt.subplots(ncols=nb_cols, nrows=math.ceil(count/nb_cols))
     
     #live view of the distributions for each packet
-    for g_id in range(0, len(plot_list)-1):
+    for g_id in range(0, len(plot_list)):
     
         col = g_id % nb_cols
         row = math.floor(g_id / nb_cols)
@@ -103,7 +103,11 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
         
      
         #convert into minutes
-        pd_distrib['interpkt_time_min'] = pd_distrib['interpkt_time_ms']/(60*1000)
+        pd_distrib['interpkt_time_min'] = pd_distrib['interpkt_time_ms']/1000 #(60*1000)
+        
+        # labels for x-axis
+        xvalues = [60, 3600] #, 86400, 604800, 2419200]
+        labels = ["1min", "1h"] # "1d", "1w", "1m" ]
         
 
         if (count > nb_cols):
@@ -120,10 +124,12 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
         #one single plot
         else:
              g = sns.ecdfplot(
-                pd_distrib['interpkt_time_min'].array
+                pd_distrib['interpkt_time_min'].array,
+                log_scale=True
             )
 
-        g.set(xlabel="inter pkt time (min) /"+ str(pd_distrib['interpkt_time_min'].size)+" pkts/@="+pd_all_flows.iloc[plot_list[g_id]]['devAddr'], ylabel='Cumulative Distribution')
+        g.set_xticks(xvalues, labels=labels)
+        g.set(xlabel="inter pkt time ("+ str(pd_distrib['interpkt_time_min'].size)+" pkts,@="+pd_all_flows.iloc[plot_list[g_id]]['devAddr']+ ")", ylabel='Cumulative Distribution')
          
         #debug
         logger_flow.info(
@@ -317,18 +323,11 @@ if __name__ == "__main__":
     pd_all_flows = pd_all_flows[pd_all_flows['nb_pkts'] >= NB_PKTS_MIN]
     logger_flow.debug("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
-    
-    
-    
-    
-    print(pd_all_flows.iloc[0])
-    res = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(pd_all_flows.iloc[0]['devAddr'],  pd_all_flows.iloc[0]['time_1st'])
 
-    #load_distribs_forDevAddr_from_disk(pd_all_flows, "00000000")
-    print(res.to_string())
-    exit(97)
-    
- 
+    print(pd_all_flows[pd_all_flows['devAddr'] == "0fd578a9"].to_string())
+
+
+
 
     # --- plots ---
     
@@ -339,6 +338,7 @@ if __name__ == "__main__":
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
     nb_cols = math.ceil(math.sqrt(nb_plots))
     plot_list = random.choices(range(0,len(pd_all_flows)-1), k=nb_plots)
+    print(plot_list)
     plot_interpkt_time_distribution_grid(pd_all_flows=pd_all_flows, plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
 
     #info
@@ -360,5 +360,5 @@ if __name__ == "__main__":
     )
 
     #correlation between inter pkt time / nb packets
-    plot_interpkt_nbpkts(pd_all_flows)
+    plot_interpkt_nbpkts(pd_all_flows[['mean_fCnt_diff', 'median_fCnt_diff', 'max_fCnt_diff', 'median_interpkt_time_ms', 'nb_pkts']])
 
