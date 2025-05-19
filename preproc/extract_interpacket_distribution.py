@@ -264,7 +264,7 @@ def eq_query_get_dup_nb(doc_id):
     :rtype: int
     """
     
-    #return(0)
+    return(0)
     
     clientES = tools.elasticsearch_open_connection()
 
@@ -620,9 +620,7 @@ class Application:
         #get the inter packet times for a given devAddr
         logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(list_devAddr_pending)) +" )")
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
-        
-        count_val = 0
-        
+    
         for devAddr in list_devAddr_pending :
 
             # get the new record(s) for this devAddr (one record per flow)
@@ -642,10 +640,6 @@ class Application:
             else:
                 logger_preprocflow.info("\t" + devAddr + "\t0" )
 
-            count_val = count_val +1
-            if (count_val > 3):
-                break
- 
             #exit condition
             if self.terminated:
                 print("------- Application interrupted ----- ")
