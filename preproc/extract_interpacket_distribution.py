@@ -56,7 +56,7 @@ logger_preprocflow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
-logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
+#logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 # system
 import signal
@@ -156,7 +156,7 @@ def es_query_get_devAddr():
  
    
 #create a record for this flow
-def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, nb_duplicates, pd_distrib):
+def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib):
    
     # new record to add
     if pd_distrib.size > 0:
@@ -169,7 +169,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, nb_du
             'mean_fCnt_diff': pd_distrib['fCnt_diff'].mean(),
             'median_fCnt_diff': pd_distrib['fCnt_diff'].median(),
             'max_fCnt_diff': pd_distrib['fCnt_diff'].max(),
-            'nb_duplicates': nb_duplicates,
+            'nb_duplicates': pd_distrib['nb_duplicates'].sum(),
             'median_interpkt_time_ms': pd_distrib['interpkt_time_ms'].median(),
             'max_interpkt_time_ms': pd_distrib['interpkt_time_ms'].max(),
             'min_interpkt_time_ms': pd_distrib['interpkt_time_ms'].min(),
@@ -185,7 +185,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, nb_du
             'max_fCnt_diff': [pd.NaT,],
             'mean_fCnt_diff': [pd.NaT,],
             'median_fCnt_diff': [pd.NaT,],
-            'nb_duplicates': nb_duplicates,
+            'nb_duplicates': pd_distrib['nb_duplicates'].sum(),
             'median_interpkt_time_ms': [pd.NaT,],
             'max_interpkt_time_ms': [pd.NaT,],
             'min_interpkt_time_ms': [pd.NaT,],
@@ -353,7 +353,6 @@ def eq_query_get_interpkt(devAddr):
                     flow['epochtime_last'] = time_current
                     flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
                     flow['fCnt_last'] = flow['pd_distrib']['fCnt'].max()
-                    
 
                     # create a pandas record at the end of the distrib
                     flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
@@ -414,7 +413,7 @@ def eq_query_get_interpkt(devAddr):
         save_distrib_to_disk(pd_distrib=flow['pd_distrib'], devAddr=devAddr, time_1st=flow['time_1st'])
 
         #extract the summarized record only
-        record_summary = extract_flow_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], nb_duplicates=flow['nb_duplicates'], pd_distrib=flow['pd_distrib'])
+        record_summary = extract_flow_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
           
         # the individual values are not anymore useful
         del(flow['pd_distrib'])
