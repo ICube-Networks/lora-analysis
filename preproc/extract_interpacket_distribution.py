@@ -56,7 +56,7 @@ logger_preprocflow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
-#logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
+logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 # system
 import signal
@@ -66,7 +66,7 @@ import time
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 
-AGG_OFFSET = 2000                   # offset for the pagination in the aggregated query
+AGG_OFFSET = 100000                   # offset for the pagination in the aggregated query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
 FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file to read/write the data frames
@@ -129,10 +129,10 @@ def es_query_get_devAddr():
                 }
             }
         )
-        #print(response)
-          
+        
         # for the next page
         pagination_count = pagination_count + 1
+        #print(pagination_count)
         
         # no more record
         if (len(response["aggregations"]["devAddr"]["buckets"]) == 0):
@@ -156,7 +156,7 @@ def es_query_get_devAddr():
  
    
 #create a record for this flow
-def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_distrib):
+def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, nb_duplicates, pd_distrib):
    
     # new record to add
     if pd_distrib.size > 0:
@@ -169,6 +169,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'mean_fCnt_diff': pd_distrib['fCnt_diff'].mean(),
             'median_fCnt_diff': pd_distrib['fCnt_diff'].median(),
             'max_fCnt_diff': pd_distrib['fCnt_diff'].max(),
+            'nb_duplicates': nb_duplicates,
             'median_interpkt_time_ms': pd_distrib['interpkt_time_ms'].median(),
             'max_interpkt_time_ms': pd_distrib['interpkt_time_ms'].max(),
             'min_interpkt_time_ms': pd_distrib['interpkt_time_ms'].min(),
@@ -184,6 +185,7 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
             'max_fCnt_diff': [pd.NaT,],
             'mean_fCnt_diff': [pd.NaT,],
             'median_fCnt_diff': [pd.NaT,],
+            'nb_duplicates': nb_duplicates,
             'median_interpkt_time_ms': [pd.NaT,],
             'max_interpkt_time_ms': [pd.NaT,],
             'min_interpkt_time_ms': [pd.NaT,],
@@ -216,26 +218,33 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
         query={
             "bool": {
                 "filter" : [
-                    {"term": {"dup_infos.is_duplicate": False}},
+                    
+                    #{"term": {"dup_infos.is_duplicate": False}},
                     {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
                     {"term": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
                 ],
+                "must": [
+                    { "exists": { "field": "dup_infos"  }  }
+                ]
             }
         },
-        runtime_mappings= {
-            "mqtt_time_epoch_mseconds": {
-                "type": "keyword",
-                "script": {
-                    "source": "ZonedDateTime zdt = ZonedDateTime.parse(doc['mqtt_time'].value.toString()); emit(zdt.toEpochMilli().toString())"
-                }
-            }
-        },
+# converting the mqtt time into a ms time is useless, since the sorting field is already automatically converted by ES
+#        runtime_mappings= {
+#            "mqtt_time_epoch_mseconds": {
+#                "type": "keyword",
+#                "script": {
+#                    "source": "ZonedDateTime zdt = ZonedDateTime.parse(doc['mqtt_time'].value.toString()); emit(zdt.toEpochMilli().toString())"
+#                }
+#            }
+#        },
         fields=[
             "mqtt_time",
             "extra_infos.phyPayload.macPayload.fhdr.fCnt",
-            "mqtt_time_epoch_mseconds",
+#            "mqtt_time_epoch_mseconds",
             "_id",
             "phyPayload",
+            "dup_infos.copy_of",
+            "dup_infos.is_duplicate",
         ],
         sort=[
             "mqtt_time",
@@ -254,34 +263,6 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
     return(response, mqtt_time_min)
     
     
-def eq_query_get_dup_nb(doc_id):
-    """ Elastic query to get the number of duplicates for a specific packet
-        
-    :param the ES document id to count # of duplicates.
-        
-    :returns: the number of duplicates for this ES document
-    
-    :rtype: int
-    """
-    
-    return(0)
-    
-    clientES = tools.elasticsearch_open_connection()
-
-
-    response = clientES.count(
-        index=myconfig.index_name,
-        query={
-            "bool": {
-                "must" : [
-                    {"term": {"dup_infos.copy_of.keyword": doc_id}}
-                ]
-            }
-        }
-    )
-
-    #-1 since I'm part of these records
-    return(response['count'] - 1)
 
 def eq_query_get_interpkt(devAddr):
     """ Elastic query to get the list of inter packet time for a given devAddr
@@ -306,7 +287,7 @@ def eq_query_get_interpkt(devAddr):
     #for all the packets generated with this devAddr
     while True:
     
-        #tx the elastic search query to the server
+        #send the elastic search query to the server
         response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
         logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
         
@@ -320,14 +301,40 @@ def eq_query_get_interpkt(devAddr):
         # identification of the flows for all the packets
         for i in range(0, len(response["hits"]["hits"])):
             found = False
-                        
             current_packet_data = response["hits"]["hits"][i]
+         
+            # If duplicate, search the flow of the original packet
+            # the original packet has already been processed since duplicates are packets received *later*
+            if current_packet_data["fields"]["dup_infos.is_duplicate"][0] is True:
+                for flow in flows_for_thisDevAddr:
+                
+                    # search for the row with this _id in the corresponding flow
+                    row_index = flow['pd_distrib'][ flow['pd_distrib']['_id'] == current_packet_data["fields"]["dup_infos.copy_of"][0]].index
+                    
+                    # one row has been found, increment the corresponding nb of duplicates
+                    if row_index.size > 0 :
+                        #if current_packet_data["fields"]["dup_infos.copy_of"][0] not in flow['pd_distrib']['_id'].values :
+                        #    logger_preprocflow.error("No packet match while we have a row index!")
+                        
+                        flow['pd_distrib'].loc[row_index, 'nb_duplicates'] += 1
+                        found = True
+                        break
+                        
+                # bug
+                if found is False:
+                    logger_preprocflow.error("No packet matches this duplicate " + current_packet_data["fields"]["_id"] + " copy of " + current_packet_data["fields"]["dup_infos.copy_of"])
+                # next packet, this duplicated packet is processed
+                continue
+                
+            # -- The rest of this loop corresponds to a non duplicated packet --
+            
+            #info on the packet to handle
             time_current = current_packet_data["sort"][0]
             fCnt_current = current_packet_data["fields"]["extra_infos.phyPayload.macPayload.fhdr.fCnt"][0]
 
             #search for an active flow to which the current packet may correspond
             for flow in flows_for_thisDevAddr:
-                time_difference_ms = time_current - flow['epochtime_last']
+                time_difference_ms = time_current - flow['epochtime_last']      # epoch time = nb of seconds since 1970
                 fCnt_difference = fCnt_current - flow['fCnt_last']
                 
    
@@ -353,9 +360,10 @@ def eq_query_get_interpkt(devAddr):
                         time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
                         fCnt_difference,
                         fCnt_current,
-                        eq_query_get_dup_nb(response["hits"]["hits"][i]["_id"]),
                         datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                         current_packet_data["fields"]["phyPayload"][0],
+                        current_packet_data["fields"]["_id"][0],
+                        0,                                        # not a duplicate
                     ]
 
                     break  # exit loop since packet corresponds to the flow, no need to further iterate.
@@ -369,9 +377,10 @@ def eq_query_get_interpkt(devAddr):
                     'interpkt_time_ms' : [0],
                     'fCnt_diff' : [0],
                     'fCnt' : [fCnt_current],
-                    'nb_duplicates': eq_query_get_dup_nb(response["hits"]["hits"][i]["_id"]),
                     'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
                     'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
+                    '_id' : current_packet_data["fields"]["_id"][0],        #new flow, so cannot be a duplicate
+                    'nb_duplicates' : 0                                     #same reason
                 }
                 
                 # a new flow is created
@@ -381,8 +390,7 @@ def eq_query_get_interpkt(devAddr):
                     'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                     'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                     'epochtime_last': time_current,
-                    'pd_distrib': pd.DataFrame(data=record),
-                    #pd.DataFrame({'interpkt_time_ms': [], 'fCnt_diff': [], 'fCnt': [],  'mqtt_time': [], 'phyPayload': [], 'test':[]}),
+                    'pd_distrib': pd.DataFrame(data=record)
                 })
                 
                     
@@ -406,7 +414,7 @@ def eq_query_get_interpkt(devAddr):
         save_distrib_to_disk(pd_distrib=flow['pd_distrib'], devAddr=devAddr, time_1st=flow['time_1st'])
 
         #extract the summarized record only
-        record_summary = extract_flow_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
+        record_summary = extract_flow_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], nb_duplicates=flow['nb_duplicates'], pd_distrib=flow['pd_distrib'])
           
         # the individual values are not anymore useful
         del(flow['pd_distrib'])
