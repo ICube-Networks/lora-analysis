@@ -576,8 +576,8 @@ class Application:
         """ Creation of the app object
         
         """
-        signal.signal(signal.SIGINT, lambda signal, frame: self._signal_handler() )
-        self.terminated = False
+        signal.signal(signal.SIGINT, lambda signal, frame: self._signal_handler() ) # protection against CTRL-C
+        self.terminated = False         # the process doesn't need to be terminated
         
         #stats
         self.pd_all_flows = pd_all_flows
@@ -595,7 +595,8 @@ class Application:
         """ Ask for all the packets for each devAddr to store info in a pandas dataframe
                     
         """
-
+            
+        
         #get the list of devaddrs in the elastic search DB
         list_devAddr_pending = es_query_get_devAddr()
         #print(list_devAddr_pending)
@@ -632,7 +633,7 @@ class Application:
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
-            #print(pd_records.to_string())
+            print(pd_records.to_string())
             
             # concatenation to the global pandaframe
             if pd_records is not None :
@@ -669,15 +670,24 @@ if __name__ == "__main__":
  
     """
     
+    
     # ---- disk -----
     # load data that is on the disk (already read previously)
-    pd_disk = load_from_disk(verbose=True)
-
+    pd_all_flows = load_from_disk(verbose=True)
+    
+    
+    # ---- debug for one specific address -----
+    #devAddr = "2f90f36a"
+    #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)       # complete distrib already processed
+    #pd_records = eq_query_get_interpkt(devAddr)                                                # dsitrib reextracted (not processed)
+    #print(pd_records)
+    #exit(0)
+  
     
     # -- elastic search ----
     # extract from elastic search what was not read on the disk
     # encapsulated in a class to be able to stop the computation with a ctrl-c
-    app = Application(pd_disk)
+    app = Application(pd_all_flows)
     app.MainLoop()
  
    
@@ -690,14 +700,3 @@ if __name__ == "__main__":
      
     
     
-    
-    #pd_records = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, "0239af84", verbose=False)
-    #boug = 0
-    #for record in pd_records:
-    #    print("-----------------------------------------------------")
-    #    print(record)
-    #    print("+++ " + str(boug) + " +++++++++")
-    #    boug = boug + 1
-    
- 
-   

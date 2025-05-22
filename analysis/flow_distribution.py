@@ -307,7 +307,6 @@ if __name__ == "__main__":
     # ---- disk -----
     # load data that is on the disk (already read previously)
     pd_all_flows = extract_interpacket_distribution.load_from_disk(verbose=True)
-    print(pd_all_flows)
     
     logger_flow.info("Reading distributions from the disk....")
     if pd_all_flows.empty:
