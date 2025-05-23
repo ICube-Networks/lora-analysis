@@ -234,7 +234,7 @@ def plot_PRR_distrib(pd_all_flows):
     sns.set()
     sns.set_theme(style='whitegrid')
     sns.set(font_scale=1)
-    values = 1 / pd_all_flows['mean_fCnt_diff']
+    values = 1 / pd_all_flows['median_fCnt_diff']
 
     g = sns.ecdfplot(
         values,
@@ -251,7 +251,47 @@ def plot_PRR_distrib(pd_all_flows):
     g.figure.clf()
          
 
-         
+
+                
+def plot_SF_PRR(pd_all_flows):
+    """ Pairplot SF and PRR
+        
+    :param distribution: a pandas dataframe with the packets (SF / PRR)
+    
+    """
+    
+    
+    # extract for each flow the SF and PRR (median values)
+    # NB: SF is mostly constant for a flow
+    values = []
+    for index, flow in pd_all_flows.iterrows():    
+        pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(flow['devAddr'],  flow['time_1st'])
+        record = {
+            'PRR' : 1 / pd_distrib['fCnt_diff'].median(),
+            'SF' : round(pd_distrib['SF'].median()),
+            'nb_pkts' : pd_distrib.size
+        }
+        values.append(record)
+    # create the associated dataframe
+    pd_values = pd.DataFrame(values)
+    
+    sns.set()
+    sns.set_theme(style='whitegrid')
+    sns.set(font_scale=1)
+
+    g = sns.relplot(
+        data=pd_values,
+        x="PRR",
+        y="SF",
+        size="nb_pkts",
+        sizes=(15, 200)
+    )
+    
+    #save figure
+    g.figure.savefig("figures/SF_PRR_pairplot.pdf")
+   
+    
+    
 
 
                     
@@ -326,13 +366,16 @@ if __name__ == "__main__":
     pd_all_flows = pd_all_flows[pd_all_flows['mean_fCnt_diff'] <= FNCT_DIFF_MAX]
     nb_records_maxfnctdiff = len(pd_all_flows)
     logger_flow.info("\t\t> removed "+ str(nb_records_minpkts - nb_records_maxfnctdiff) + " flows with a toot high fnctdiff (>=" + str(FNCT_DIFF_MAX) + ")" )
-    logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
+    logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " flows to process")
 
     
 
  
 
     # --- plots ---
+    
+    #pairplot SF / PRR for all packets (flows are used to estimate the PRR)
+    plot_SF_PRR(pd_all_flows)
     
     #PRR (fcnt diff between consecutive packets)
     plot_PRR_distrib(pd_all_flows)

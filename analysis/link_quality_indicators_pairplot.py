@@ -202,6 +202,6 @@ if __name__ == "__main__":
     results_df = results_df[results_df['rssi'] < 0]
     logger_quality_corr.info(results_df)
     
-    #plot it
+    #pairplot for the multiple linkqual indicators
     plot_SF_SNR_RSSI(results_df)
     

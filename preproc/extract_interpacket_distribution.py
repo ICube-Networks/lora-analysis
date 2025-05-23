@@ -228,23 +228,14 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
                 ]
             }
         },
-# converting the mqtt time into a ms time is useless, since the sorting field is already automatically converted by ES
-#        runtime_mappings= {
-#            "mqtt_time_epoch_mseconds": {
-#                "type": "keyword",
-#                "script": {
-#                    "source": "ZonedDateTime zdt = ZonedDateTime.parse(doc['mqtt_time'].value.toString()); emit(zdt.toEpochMilli().toString())"
-#                }
-#            }
-#        },
         fields=[
             "mqtt_time",
             "extra_infos.phyPayload.macPayload.fhdr.fCnt",
-#            "mqtt_time_epoch_mseconds",
             "_id",
             "phyPayload",
             "dup_infos.copy_of",
             "dup_infos.is_duplicate",
+            "txInfo.loRaModulationInfo.spreadingFactor"
         ],
         sort=[
             "mqtt_time",
@@ -359,6 +350,7 @@ def eq_query_get_interpkt(devAddr):
                         time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
                         fCnt_difference,
                         fCnt_current,
+                        current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0],
                         datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
                         current_packet_data["fields"]["phyPayload"][0],
                         current_packet_data["fields"]["_id"][0],
@@ -376,10 +368,11 @@ def eq_query_get_interpkt(devAddr):
                     'interpkt_time_ms' : [0],
                     'fCnt_diff' : [0],
                     'fCnt' : [fCnt_current],
+                    'SF' : [current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0]],
                     'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
                     'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
-                    '_id' : current_packet_data["fields"]["_id"][0],        #new flow, so cannot be a duplicate
-                    'nb_duplicates' : 0                                     #same reason
+                    '_id' : [current_packet_data["fields"]["_id"][0]],        #new flow, so cannot be a duplicated packet
+                    'nb_duplicates' : [0]                                     #same reason
                 }
                 
                 # a new flow is created
@@ -636,7 +629,7 @@ class Application:
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
-            print(pd_records.to_string())
+            #print(pd_records.to_string())
             
             # concatenation to the global pandaframe
             if pd_records is not None :
@@ -686,9 +679,6 @@ if __name__ == "__main__":
     #pd_records = eq_query_get_interpkt(devAddr)      # distrib reextracted (not processed)
     #print(pd_records)
     #exit(0)
-  
-  
-
 
     # -- elastic search ----
     # extract from elastic search what was not read on the disk
