@@ -352,7 +352,7 @@ def eq_query_get_interpkt(devAddr):
                     # update info of this flow
                     flow['epochtime_last'] = time_current
                     flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
-                    flow['fCnt_last'] = flow['pd_distrib']['fCnt'].max()
+                    flow['fCnt_last'] = fCnt_current
 
                     # create a pandas record at the end of the distrib
                     flow['pd_distrib'].loc[len(flow['pd_distrib'].index)] = [
@@ -409,8 +409,11 @@ def eq_query_get_interpkt(devAddr):
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
  
+        #print(flow['pd_distrib'].to_string())
+        
         #save the raw distribution (dataframe in a file)
         save_distrib_to_disk(pd_distrib=flow['pd_distrib'], devAddr=devAddr, time_1st=flow['time_1st'])
+        
 
         #extract the summarized record only
         record_summary = extract_flow_record(devAddr=devAddr, fCnt_1st=flow['fCnt_1st'], fCnt_last=flow['fCnt_last'],  time_1st=flow['time_1st'], time_last=flow['time_last'], pd_distrib=flow['pd_distrib'])
@@ -677,13 +680,16 @@ if __name__ == "__main__":
     
     
     # ---- debug for one specific address -----
-    #devAddr = "2f90f36a"
+    #devAddr = "0e7290de"
+    #print(pd_all_flows[pd_all_flows['devAddr'] == devAddr])
     #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)       # complete distrib already processed
-    #pd_records = eq_query_get_interpkt(devAddr)                                                # dsitrib reextracted (not processed)
+    #pd_records = eq_query_get_interpkt(devAddr)      # distrib reextracted (not processed)
     #print(pd_records)
     #exit(0)
   
-    
+  
+
+
     # -- elastic search ----
     # extract from elastic search what was not read on the disk
     # encapsulated in a class to be able to stop the computation with a ctrl-c

@@ -60,8 +60,8 @@ import extract_interpacket_distribution
 
 #parameters
 NB_PKTS_MIN = 50        # minimum number of packets for a given devAddr (else discarded) to compute the median value
+FNCT_DIFF_MAX = 100     # maximum average fnct_diff for a flow
 NB_PLOTS = 16           # number of plots for individual distributions
-
 
 
 
@@ -315,17 +315,22 @@ if __name__ == "__main__":
         exit(0)
     else:
         logger_flow.debug("\t\t> "+ str(len(pd_all_flows)) + " devAddrs in the disk")
-        nb_records_unfiltered = len(pd_all_flows)
 
     
-    #filtering
+    #filtering   -- MIN NB PACKETS
+    nb_records_unfiltered = len(pd_all_flows)
     pd_all_flows = pd_all_flows[pd_all_flows['nb_pkts'] >= NB_PKTS_MIN]
-    logger_flow.info("\t\t> removed "+ str(nb_records_unfiltered - len(pd_all_flows)) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
+    nb_records_minpkts = len(pd_all_flows)
+    logger_flow.info("\t\t> removed "+ str(nb_records_unfiltered - nb_records_minpkts) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
+    #filtering   -- MAX FNCT DIFF
+    pd_all_flows = pd_all_flows[pd_all_flows['mean_fCnt_diff'] <= FNCT_DIFF_MAX]
+    nb_records_maxfnctdiff = len(pd_all_flows)
+    logger_flow.info("\t\t> removed "+ str(nb_records_minpkts - nb_records_maxfnctdiff) + " flows with a toot high fnctdiff (>=" + str(FNCT_DIFF_MAX) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " devAddrs to process")
 
     
 
-
+ 
 
     # --- plots ---
     
