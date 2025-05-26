@@ -363,41 +363,39 @@ def eq_query_get_interpkt(devAddr):
             
             #no flow exists -> create a new one for this devAddr
             if found is False:
-                
-                record = {
-                    'interpkt_time_ms' : [0],
-                    'fCnt_diff' : [0],
-                    'fCnt' : [fCnt_current],
-                    'SF' : [current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0]],
-                    'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
-                    'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
-                    '_id' : [current_packet_data["fields"]["_id"][0]],        #new flow, so cannot be a duplicated packet
-                    'nb_duplicates' : [0]                                     #same reason
-                }
-                
-                # a new flow is created
-                flows_for_thisDevAddr.append({
-                    'fCnt_1st': fCnt_current,
-                    'fCnt_last': fCnt_current,
-                    'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
-                    'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
-                    'epochtime_last': time_current,
-                    'pd_distrib': pd.DataFrame(data=record)
-                })
-                
+                try:
+                    record = {
+                        'interpkt_time_ms' : [0],
+                        'fCnt_diff' : [0],
+                        'fCnt' : [fCnt_current],
+                        'SF' : [current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0]],
+                        'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
+                        'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
+                        '_id' : [current_packet_data["fields"]["_id"][0]],        #new flow, so cannot be a duplicated packet
+                        'nb_duplicates' : [0]                                     #same reason
+                    }
                     
-                #force the type of the column (int) for fCnt
-                #flows_for_thisDevAddr[-1]['pd_distrib']['fCnt'] = int
-                #flows_for_thisDevAddr[-1]['pd_distrib']['fCnt_diff'] = int
-
+                    # a new flow is created
+                    flows_for_thisDevAddr.append({
+                        'fCnt_1st': fCnt_current,
+                        'fCnt_last': fCnt_current,
+                        'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                        'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                        'epochtime_last': time_current,
+                        'pd_distrib': pd.DataFrame(data=record)
+                    })
+                except Exception as e :
+                    logger_preprocflow.critical("An error occured when parsing an ES response -> "+ str(e))
+                    logger_preprocflow.critical("response:")
+                    logger_preprocflow.critical(response)
+                    logger_preprocflow.critical("id="+ response[index]['_id'])
+                    exit(7)
+                    
+#110c5a7a
     
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
             break
-
-    #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-    #    print(flows_for_thisDevAddr[0]['pd_distrib'])
-
 
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
@@ -485,7 +483,7 @@ def save_to_disk(pd_all_flows):
  
 
 
-def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
+def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib, verbose=False):
     """ load a list of individual distribution from the disk into a dataframe (with parquet)
         
     :param devAddr: the devAddr to read
@@ -496,8 +494,6 @@ def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
     
     """
      
-    
-    pd_distrib = []
     #get all the mqtt_time for theis devAddr
     for time_1st in pd_all_flows[pd_all_flows['devAddr']== devAddr]['time_1st']:
     
@@ -614,7 +610,7 @@ class Application:
                 list_devAddr_pending.remove(devAddr)
                 
                 if (logger_preprocflow.getEffectiveLevel() >= logging.DEBUG):
-                    pd_records = load_distribs_forDevAddr_from_disk(self.pd_all_flows, devAddr, verbose=False)
+                    pd_records = load_distribs_forDevAddr_from_disk(self.pd_all_flows, devAddr, [], verbose=False)
                       
                     logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
                     logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
@@ -675,7 +671,7 @@ if __name__ == "__main__":
     # ---- debug for one specific address -----
     #devAddr = "0e7290de"
     #print(pd_all_flows[pd_all_flows['devAddr'] == devAddr])
-    #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)       # complete distrib already processed
+    #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_records=[], verbose=False)       # complete distrib already processed
     #pd_records = eq_query_get_interpkt(devAddr)      # distrib reextracted (not processed)
     #print(pd_records)
     #exit(0)
