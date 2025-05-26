@@ -196,16 +196,9 @@ def plot_interpkt_nbpkts(pd_all_flows):
     sns.set(font_scale=1)
 
 
-    #g = sns.scatterplot(
-    #    x="median_interpkt_time_ms",
-    #    y="nb_pkts",
-    #    data=pd_all_flows
-    #    )
     g = sns.pairplot(
         pd_all_flows,
         diag_kind="kde",
-    #   corner=True,
-    #    diag_kind="hist",
     )
     g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)
     
@@ -213,11 +206,10 @@ def plot_interpkt_nbpkts(pd_all_flows):
     g.figure.savefig("figures/flow_interpkttime_nbpkts_correlation.pdf")
     g.figure.clf()
   
+    # corr coeff
     r,p = scipy.stats.pearsonr(pd_all_flows['median_interpkt_time_ms'], pd_all_flows["nb_pkts"])
-    
-    logger_flow.info("Plot the distribution for a few devAddr")
-    logger_flow.info('correlation coefficient =' + str(r))
-    logger_flow.info('p-value = ' + str(p))
+    logger_flow.info('Pearson coefficient(median_interpkt_time_ms/nb_pkts) =' + str(r))
+    logger_flow.info('\t\t> p-value = ' + str(p))
     
 
 
@@ -286,12 +278,51 @@ def plot_SF_PRR(pd_all_flows):
         size="nb_pkts",
         sizes=(15, 200)
     )
-    
+    g.set(xlabel='Packet Reception Rate', ylabel='Spreading Factor')
+
     #save figure
     g.figure.savefig("figures/SF_PRR_pairplot.pdf")
    
+ 
+
+                
+def plot_PRR_timedistrib(pd_all_flows):
+    """ Pairplot SF and PRR
+        
+    :param distribution: a pandas dataframe with the packets (SF / PRR)
+    
+    """
     
     
+    # extract for each flow the SF and PRR (median values)
+    # NB: SF is mostly constant for a flow
+    pd_distrib = []
+    for devAddr in pd_all_flows['devAddr']:
+        pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib)
+
+   
+    pd_values = pd.concat(pd_distrib)
+    pd_values['hour'] = pd.to_datetime(pd_values['mqtt_time']).dt.hour
+    print(pd_values['hour'])
+    
+    exit(4)
+
+    sns.set()
+    sns.set_theme(style='whitegrid')
+    sns.set(font_scale=1)
+
+    g = sns.relplot(
+        data=pd_values,
+        x="PRR",
+        y="SF",
+        sizes=(15, 200)
+    )
+    g.set(xlabel='Packet Reception Rate', ylabel='Spreading Factor')
+
+    #save figure
+    g.figure.savefig("figures/SF_PRR_pairplot.pdf")
+   
+ 
 
 
                     
@@ -374,11 +405,14 @@ if __name__ == "__main__":
 
     # --- plots ---
     
+    #PRR (fcnt diff between consecutive packets)
+    plot_PRR_distrib(pd_all_flows)
+ 
     #pairplot SF / PRR for all packets (flows are used to estimate the PRR)
     plot_SF_PRR(pd_all_flows)
     
-    #PRR (fcnt diff between consecutive packets)
-    plot_PRR_distrib(pd_all_flows)
+    # time distribution of the packet losses
+    plot_PRR_timedistrib(pd_all_flows)
     
     # plot a grid of distributions (randomly selected flows)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
