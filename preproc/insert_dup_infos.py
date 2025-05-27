@@ -172,9 +172,9 @@ def get_nodupinfo_phyPayload(payload_handled):
             "phyPayload",
             "mqtt_time",
         ],
-        #no sort
-        #sort=["mqtt_time"],
-        sort=["_doc"]
+        #sorting with the mqtt time. Else, I will not get the first packet for this payload!
+        sort=["mqtt_time"],
+        
     )
     
     clientES.transport.close()
