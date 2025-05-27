@@ -213,12 +213,9 @@ class queries:
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST =  {
             "bool": {
-              "must": [
-                    {
-                      "exists": {
-                      "field": "extra_infos"
-                     }
-                  }
+              "filter": [
+                    {"exists": { "field": "extra_infos" }},
+                    {"match": {"rxInfo.modulation": "LORA"}},
                 ]
             }
         }
@@ -230,15 +227,9 @@ class queries:
             "bool": {
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
-
-              ],
-              "must": [
-                    {
-                      "exists": {
-                      "field": "extra_infos"
-                     }
-                  }
-                ]
+                    { "exists": {"field": "extra_infos" }},
+                    {"match": {"rxInfo.modulation": "LORA"}},
+              ]
             }
         }
         
@@ -250,15 +241,10 @@ class queries:
             "bool": {
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
-                    { "match":  { "extra_infos.phyPayload.macPayload.fhdr.devAddr": "000173b7" }},
-              ],
-              "must": [
-                    {
-                      "exists": {
-                      "field": "extra_infos"
-                     }
-                  }
-                ]
+                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": "000173b7" }},
+                    {"exists": {"field": "extra_infos"}},
+                    {"match": {"txInfo.modulation": "LORA"}},
+              ]
             }
         }
     """
@@ -270,11 +256,10 @@ class queries:
     QUERY_NOEXTRAINFO_EXIST =  {
             "bool": {
               "must_not": [
-                    {
-                      "exists": {
-                      "field": "extra_infos"
-                     }
-                  }
+                    {"exists": {"field": "extra_infos" } }
+                ],
+                "must": [
+                    {"match": {"txInfo.modulation": "LORA"}},
                 ]
             }
         }
@@ -288,12 +273,12 @@ class queries:
     QUERY_NODATA =  {
             "bool": {
               "must_not": [
-                    {
-                        "term": {
-                            "extra_infos.phyPayload.mhdr.mType": "2"
-                        }
-                     }
+                    { "term": { "extra_infos.phyPayload.mhdr.mType": "2" }  }
+                ],
+                "must": [
+                    {"match": {"txInfo.modulation": "LORA"}},
                 ]
+
             }
         }
     """
@@ -304,9 +289,8 @@ class queries:
     QUERY_DATA =  {
             "bool": {
               "must": [
-                    {
-                    "term": {"extra_infos.phyPayload.mhdr.mType": "2"}
-                    }
+                    { "term": {"extra_infos.phyPayload.mhdr.mType": "2"}    },
+                    {"match": {"txInfo.modulation": "LORA"}},
                 ]
             }
         }
@@ -319,14 +303,10 @@ class queries:
             "bool": {
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
-
+                    {"match": {"txInfo.modulation": "LORA"}},
               ],
               "must": [
-                    {
-                        "term": {
-                            "extra_infos.phyPayload.mhdr.mType": "2"
-                        }
-                     }
+                    { "term": { "extra_infos.phyPayload.mhdr.mType": "2"  } }
                 ]
             }
         }
@@ -339,6 +319,7 @@ class queries:
     QUERY_ALL = {
             "bool": {
                 "filter": [
+                    {"match": {"txInfo.modulation": "LORA"}},
                     {"match": {"rxInfo.crcStatus": "CRC_OK"}},
                     {
                         "range":{
@@ -359,6 +340,7 @@ class queries:
     QUERY_ALL_NODUP = {
             "bool": {
                 "filter": [
+                    {"match": {"txInfo.modulation": "LORA"}},
                     {"match": {"rxInfo.crcStatus": "CRC_OK"}},
                     {"match": {"dup_infos.is_duplicate": False}},
                     {

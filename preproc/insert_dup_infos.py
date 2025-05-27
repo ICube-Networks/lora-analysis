@@ -147,7 +147,10 @@ def get_nodupinfo_phyPayload(payload_handled):
     """
     Returns one phyPayload in the dataset that has no dup_info field different from "payload_handled"
     and its mqtt_time
-  
+ 
+    :param payload_handled: the payload which is forbidden in the query 
+    (payload just handled previously, so let enough time to the system to update the index) 
+ 
     """
     
     clientES = tools.elasticsearch_open_connection()
@@ -156,6 +159,7 @@ def get_nodupinfo_phyPayload(payload_handled):
         index=myconfig.index_name,
         size=1,
         request_cache=False,
+        source=False,
         query={
             "bool": {
                 "must_not" : [
@@ -169,11 +173,12 @@ def get_nodupinfo_phyPayload(payload_handled):
             }
         },
         fields=[
-            "phyPayload"
+            "phyPayload",
+            "mqtt_time",
         ],
         #no sort
-        sort=["mqtt_time"],
-        #sort=["_doc"]
+        #sort=["mqtt_time"],
+        sort=["_doc"]
     )
     
     clientES.transport.close()
@@ -184,8 +189,8 @@ def get_nodupinfo_phyPayload(payload_handled):
         return(None)
     else:
         result = {}
-        result['phyPayload'] = response['hits']['hits'][0]['_source']['phyPayload']
-        result['mqtt_time'] = response['hits']['hits'][0]['_source']['mqtt_time']
+        result['phyPayload'] = response['hits']['hits'][0]['fields']['phyPayload']
+        result['mqtt_time'] = response['hits']['hits'][0]['fields']['mqtt_time']
         return(result)
 
 
@@ -196,6 +201,10 @@ def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
     """
     Returns the packets with the corresponding phyPayload and a time >= mqtt_time_min - OFFSET_MINUTES_MAX
   
+    :param phyPayload: the phyPayload to collect
+
+    :param mqtt_time_min: the mqtt_time_min to read
+
     """
 
     # to detect all the duplicates, shift the mqtt_time_min in the past!
@@ -249,7 +258,7 @@ if __name__ == "__main__":
     # Process per phyPayload
     while True:
          
-        # retrieve the earliest entry not handled
+        # retrieve one entry not handled
         phyPayload_min_info = get_nodupinfo_phyPayload(phyPayload_min_info['phyPayload'])
         
         # no frame to be processed: all of them have a dup_infos field with the right version number
