@@ -178,16 +178,16 @@ def get_nodupinfo_phyPayload(payload_handled):
     )
     
     clientES.transport.close()
-    #print(response)
 
     # result
     if response['hits']['total']['value'] == 0:
         return(None)
     else:
         result = {}
-        result['phyPayload'] = response['hits']['hits'][0]['fields']['phyPayload']
-        result['mqtt_time'] = response['hits']['hits'][0]['fields']['mqtt_time']
+        result['phyPayload'] = response['hits']['hits'][0]['fields']['phyPayload'][0]
+        result['mqtt_time'] = response['hits']['hits'][0]['fields']['mqtt_time'][0]
         return(result)
+        
 
 
 
