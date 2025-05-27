@@ -163,11 +163,7 @@ def get_nodupinfo_phyPayload(payload_handled):
         query={
             "bool": {
                 "must_not" : [
-                    {"range": {
-                        "dup_infos.version": {
-                            "gte": DUP_INFO_VERSION
-                        }
-                    }},
+                    {"term": {"dup_infos.version": DUP_INFO_VERSION}},
                     {"term": {"phyPayload.keyword": payload_handled}}
                 ]
             }
