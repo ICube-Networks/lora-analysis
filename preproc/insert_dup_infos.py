@@ -188,54 +188,6 @@ def get_nodupinfo_phyPayload_list():
         
 
 
-def get_nodupinfo_phyPayload(payload_handled):
-    """
-    Returns one phyPayload in the dataset that has no dup_info field and different from "payload_handled"
-    and its mqtt_time
- 
-    :param payload_handled: the payload which is forbidden in the query 
-    (payload just handled previously, so let enough time to the system to update the index) 
- 
-    """
-    
-    clientES = tools.elasticsearch_open_connection()
- 
-    response = clientES.search(
-        index=myconfig.index_name,
-        size=1,
-        request_cache=False,
-        source=True, #False,
-        query={
-            "bool": {
-                "must_not" : [
-                    {"term": {"dup_infos.version": DUP_INFO_VERSION}},
-                    {"term": {"phyPayload.keyword": payload_handled}}
-                ]
-            }
-        },
-        fields=[
-            "phyPayload",
-            "mqtt_time",
-        ],
-        #sorting with the mqtt time. Else, I will not get the first packet for this payload!
-        sort=["mqtt_time"],
-        
-    )
-
-    clientES.transport.close()
-    print(response)
-
-    # result
-    if response['hits']['total']['value'] == 0:
-        return(None)
-    else:
-        result = {}
-        result['phyPayload'] = response['hits']['hits'][0]['fields']['phyPayload'][0]
-        result['mqtt_time'] = response['hits']['hits'][0]['fields']['mqtt_time'][0]
-        return(result)
-        
-
-
 
 
 #return all the packets with the corresponding payload, and a larger MQTT TIME
@@ -309,7 +261,7 @@ if __name__ == "__main__":
         for phyPayload_info in phyPayload_list :
         
             #info
-            logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'])
+            logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " doc_count=" + str(phyPayload_info['doc_count']))
 
             # earliest mqtt_time (2000 year by default)
             mqtt_time_min = phyPayload_info['mqtt_time']
