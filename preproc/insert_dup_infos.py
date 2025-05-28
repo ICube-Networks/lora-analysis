@@ -142,6 +142,52 @@ def create_updated_entries(response):
 
 
 
+def get_nodupinfo_phyPayload_list():
+    """
+    Returns the phyPayloads in the dataset that has no dup_info field 
+ 
+    """
+    
+    clientES = tools.elasticsearch_open_connection()
+ 
+    response = clientES.search(
+        index=myconfig.index_name,
+        size=tools.queries.QUERY_NB_RESULT,
+        request_cache=False,
+        source=False,
+        query={
+            "bool": {
+                "must_not" : [
+                    {"term": {"dup_infos.version": DUP_INFO_VERSION}}
+                ]
+            }
+        },
+        aggs={
+            "phyPayload" : {
+                "terms": { "field" : "phyPayload.keyword"},
+                "aggs":{
+                     "min_mqtt_time": {
+                        "min" : { "field" : "mqtt_time" }
+                    }
+                }
+            }
+        }
+    )
+    
+    clientES.transport.close()
+    
+    # result
+    phyPayload_list = []
+    for elem in response['aggregations']['phyPayload']['buckets']:
+        result = {}
+        result['phyPayload']= elem['key']
+        result['doc_count'] = elem['doc_count']
+        result['mqtt_time'] = elem['min_mqtt_time']['value_as_string']
+        phyPayload_list.append(result)
+    #NB: the list may be empty if the query does not return any result
+    return(phyPayload_list)
+        
+
 
 def get_nodupinfo_phyPayload(payload_handled):
     """
@@ -247,53 +293,53 @@ if __name__ == "__main__":
     
     #connections
     clientES = tools.elasticsearch_open_connection()
-    phyPayload_min_info = {}
-    phyPayload_min_info['phyPayload'] = ''
- 
 
     # Scroll now all the documents of the elastic search index until there is no remainnig doc to handle
     # Process per phyPayload
     while True:
-         
-        # retrieve one entry not handled
-        phyPayload_min_info = get_nodupinfo_phyPayload(phyPayload_min_info['phyPayload'])
+        
+        # retrieve 10K non handled phyPayloads (with their mqtt time and their doc_count)
+        phyPayload_list = get_nodupinfo_phyPayload_list()
         
         # no frame to be processed: all of them have a dup_infos field with the right version number
-        if phyPayload_min_info is None:
+        if len(phyPayload_list) == 0:
             logger_dup.info("The dataset does not contain any phyPayload without a dup_info field (version="+ DUP_INFO_VERSION +")")
             exit(0)
-         
-        #info
-        logger_dup.info("\t> phyPayload_min=" + phyPayload_min_info['phyPayload'])
-
-        # earliest mqtt_time (2000 year by default)
-        mqtt_time_min = phyPayload_min_info['mqtt_time']
-        
-        # for each phyPayload, process per mqtt_time
-        while True:
-            response = get_packets_with_payload_mqtt_min(phyPayload_min_info['phyPayload'], mqtt_time_min)
-           
-            # add the is_duplicate field to each entry of this response
-            bulk_update = create_updated_entries(response['hits']['hits'])
-
-            #push the update
-            if len(bulk_update) > 0 :
-                logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_min_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
-                tools.elasticsearch_push_updates(bulk_update)
-                logger_dup.info("\t\t... pushed ")
-            else:
-                logger_dup.info("\t\tNo update in this window (" + phyPayload_min_info['phyPayload'] + ")")
                 
-            # garbage collector
-            #del bulk_update[:]
+        # for each payload in the list
+        for phyPayload_info in phyPayload_list :
+        
+            #info
+            logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'])
 
-            #no remaining response -> return in the main loop
-            if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
-                logger_dup.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_min_info['phyPayload'])
-                break
+            # earliest mqtt_time (2000 year by default)
+            mqtt_time_min = phyPayload_info['mqtt_time']
+            
+            # for each phyPayload, process per mqtt_time
+            while True:
+                response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], mqtt_time_min)
+               
+                # add the is_duplicate field to each entry of this response
+                bulk_update = create_updated_entries(response['hits']['hits'])
 
-            # next min mqtt time
-            mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
+                #push the update
+                if len(bulk_update) > 0 :
+                    logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
+                    tools.elasticsearch_push_updates(bulk_update)
+                    logger_dup.info("\t\t... pushed ")
+                else:
+                    logger_dup.info("\t\tNo update in this window (" + phyPayload_info['phyPayload'] + ")")
+                    
+                # garbage collector
+                #del bulk_update[:]
+
+                #no remaining response -> return in the main loop
+                if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
+                    logger_dup.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_info['phyPayload'])
+                    break
+
+                # next min mqtt time
+                mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
 
         
     clientES.transport.close()
