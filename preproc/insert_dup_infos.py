@@ -134,7 +134,6 @@ def create_updated_entries(response):
         req_update['_id']          = response[index]['_id']
         req_update['dup_infos']    = dup_infos
         logger_dup.debug(json.dumps(req_update, sort_keys=True, indent=4))
-        logger_dup.info(response[index]['_id'])
         # insert this update to the current sequence
         bulk_update.append(req_update)
     
