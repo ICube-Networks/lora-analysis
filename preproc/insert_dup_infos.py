@@ -134,7 +134,7 @@ def create_updated_entries(response):
         req_update['_id']          = response[index]['_id']
         req_update['dup_infos']    = dup_infos
         logger_dup.debug(json.dumps(req_update, sort_keys=True, indent=4))
-         
+        logger_dup.info(response[index]['_id'])
         # insert this update to the current sequence
         bulk_update.append(req_update)
     
@@ -145,7 +145,7 @@ def create_updated_entries(response):
 
 def get_nodupinfo_phyPayload(payload_handled):
     """
-    Returns one phyPayload in the dataset that has no dup_info field different from "payload_handled"
+    Returns one phyPayload in the dataset that has no dup_info field and different from "payload_handled"
     and its mqtt_time
  
     :param payload_handled: the payload which is forbidden in the query 
@@ -159,7 +159,7 @@ def get_nodupinfo_phyPayload(payload_handled):
         index=myconfig.index_name,
         size=1,
         request_cache=False,
-        source=False,
+        source=True, #False,
         query={
             "bool": {
                 "must_not" : [
@@ -176,8 +176,9 @@ def get_nodupinfo_phyPayload(payload_handled):
         sort=["mqtt_time"],
         
     )
-    
+
     clientES.transport.close()
+    print(response)
 
     # result
     if response['hits']['total']['value'] == 0:
