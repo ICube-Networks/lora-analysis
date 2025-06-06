@@ -112,18 +112,15 @@ def plot_nbdups_CDF(pd_flat_values):
     sns.set()
     sns.set_theme()
     sns.set(font_scale=2)
+    sns.set(rc={"figure.figsize":(11, 5)})
       
     g = sns.ecdfplot(
         pd_flat_values,
-        aspect=11/5,
-        label='big'
     )
     g.set(xlabel='Number of duplicates', ylabel='Cumulative Distribution')
     g.set(xlim=(0, 10))
     g.set_xticks([0,1,2,3,4,5,6,7,8,9,10])
-    g.tight_layout()
-
-        
+       
         
     #save figure
     plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)

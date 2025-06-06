@@ -159,7 +159,7 @@ def plot_interpkt_ecdf(values, figname, xlabel):
     sns.set(font_scale=1)
       
     g = sns.ecdfplot(
-            values,
+        values,
         log_scale=True
     )
     g.set(xlabel=xlabel, ylabel='Cumulative Distribution')
