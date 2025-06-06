@@ -111,9 +111,10 @@ def plot_nbdups_CDF(pd_flat_values):
     
     sns.set()
     sns.set_theme()
-    sns.set(font_scale=2)
     sns.set(rc={"figure.figsize":(11, 5)})
-      
+    sns.set_context("notebook", font_scale=2.0)
+    
+    
     g = sns.ecdfplot(
         pd_flat_values,
     )
