@@ -238,7 +238,7 @@ def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
 # executable
 if __name__ == "__main__":
     """
-    Executes the script to pinsert duplicate info in the elastic search dataset
+    Executes the script to insert duplicate info in the elastic search dataset
  
     """
     

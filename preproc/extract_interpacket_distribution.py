@@ -486,9 +486,15 @@ def save_to_disk(pd_all_flows):
 def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib, verbose=False):
     """ load a list of individual distribution from the disk into a dataframe (with parquet)
         
-    :param devAddr: the devAddr to read
+    :param pd_all_flows: a pandas distribution representing all the flows (synthetic data) in the dataset
+
+    :param devAddr: the devAddr to read from the filesystem
     
-    :returns: a list of dataframes with the raw distribution (inter packet time + fCnt + etc.)
+    :param pd_distrib: a list to complete with the additionnal 
+    
+    :param verbose: verbose mode (default=False) to debug
+     
+    :returns: the updated pd_distrib (a list of dataframes with the raw distribution  -- inter packet time + fCnt + etc.)
     
     :rtype: a list of dataframe (be careful, several flows may be included, since several flows can be associated to the same devAddr)
     

@@ -221,7 +221,6 @@ def plot_PRR_distrib(pd_all_flows):
     :param distribution: a pandas dataframe with the data to plot
     
     """
-    logger_flow.info("Plot the distribution of the PRR for all flows")
     
     sns.set()
     sns.set_theme(style='whitegrid')
@@ -252,7 +251,6 @@ def plot_SF_PRR(pd_all_flows):
     
     """
     
-    
     # extract for each flow the SF and PRR (median values)
     # NB: SF is mostly constant for a flow
     values = []
@@ -273,60 +271,87 @@ def plot_SF_PRR(pd_all_flows):
 
     g = sns.relplot(
         data=pd_values,
-        x="PRR",
-        y="SF",
+        x="SF",
+        y="PRR",
         size="nb_pkts",
         sizes=(15, 200)
     )
-    g.set(xlabel='Packet Reception Rate', ylabel='Spreading Factor')
+    g.set(xlabel='Spreading Factor', ylabel='Packet Reception Rate')
 
     #save figure
-    g.figure.savefig("figures/SF_PRR_pairplot.pdf")
+    g.figure.savefig("figures/flow_SF_PRR_pairplot.pdf")
    
  
 
                 
-def plot_PRR_timedistrib(pd_all_flows):
+def plot_nbdups_timedistrib(pd_flat_values):
     """ Pairplot SF and PRR
         
-    :param distribution: a pandas dataframe with the packets (SF / PRR)
+    :param distribution: a pandas dataframe with the flows 
     
     """
     
+    # extract the hour of the day
+    pd_flat_values['hour'] = pd.to_datetime(pd_flat_values['mqtt_time']).dt.hour
     
-    # extract for each flow the SF and PRR (median values)
-    # NB: SF is mostly constant for a flow
-    pd_distrib = []
-    for devAddr in pd_all_flows['devAddr']:
-        pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib)
+    # grouby the two columns
+    # unstack to transform into a 2D arrray, completing with zero for N/A values
+    values = pd_flat_values[pd_flat_values['nb_duplicates'] < 10].groupby(['nb_duplicates', 'hour']).size().unstack().fillna(0)
+         
+ 
+    sns.set()
+    sns.set_theme(style='whitegrid')
+    sns.set(font_scale=1)
+
+    g = sns.heatmap(
+        data=values,
+    )
+    g.set(xlabel='Hour', ylabel='Number of duplicates')
+
+    #save figure
+    g.figure.savefig("figures/flow_nbdups_time_heatmap.pdf")
 
    
-    pd_values = pd.concat(pd_distrib)
-    pd_values['hour'] = pd.to_datetime(pd_values['mqtt_time']).dt.hour
-    print(pd_values['hour'])
+   
+   
+ 
+def plot_nbdups_prr(pd_all_flows):
+    """ relation nb_dups_prr
+        
+    :param distribution: a pandas dataframe with the flows
     
-    exit(4)
-
+    """
+    
+    # extract for each flow the SF and PRR (median values)
+    values = []
+    for index, flow in pd_all_flows.iterrows():
+        pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(flow['devAddr'],  flow['time_1st'])
+        record = {
+            'PRR' : 1 / pd_distrib['fCnt_diff'].mean(),
+            'nb_duplicates' : pd_distrib['nb_duplicates'].median(),
+            'nb_pkts' : pd_distrib.size
+        }
+        values.append(record)
+        
+    # create the associated dataframe
+    pd_values = pd.DataFrame(values)
+    
+    #plot style
     sns.set()
     sns.set_theme(style='whitegrid')
     sns.set(font_scale=1)
 
     g = sns.relplot(
         data=pd_values,
-        x="PRR",
-        y="SF",
+        x="nb_duplicates",
+        y="PRR",
+        size="nb_pkts",
         sizes=(15, 200)
     )
-    g.set(xlabel='Packet Reception Rate', ylabel='Spreading Factor')
+    g.set(xlabel='Median number of duplicates received', ylabel='Average packet Reception Rate')
 
     #save figure
-    g.figure.savefig("figures/SF_PRR_pairplot.pdf")
-   
- 
-
-
-                    
-
+    g.figure.savefig("figures/flow_nbdups_PRR_pairplot.pdf")
 
 
 
@@ -368,7 +393,7 @@ def main(argv):
     
 # executable
 if __name__ == "__main__":
-    """Executes the script to analyze the distribution of inter packet times
+    """Executes the script to analyze the flows
  
     """
     
@@ -387,23 +412,29 @@ if __name__ == "__main__":
     else:
         logger_flow.debug("\t\t> "+ str(len(pd_all_flows)) + " devAddrs in the disk")
 
+
+
+
+
+    # --- filtering ---
     
-    #filtering   -- MIN NB PACKETS
+    
+    #-- MIN NB PACKETS
     nb_records_unfiltered = len(pd_all_flows)
     pd_all_flows = pd_all_flows[pd_all_flows['nb_pkts'] >= NB_PKTS_MIN]
     nb_records_minpkts = len(pd_all_flows)
     logger_flow.info("\t\t> removed "+ str(nb_records_unfiltered - nb_records_minpkts) + " flows without enough packets (<" + str(NB_PKTS_MIN) + ")" )
-    #filtering   -- MAX FNCT DIFF
+    
+    #-- MAX FNCT DIFF
     pd_all_flows = pd_all_flows[pd_all_flows['mean_fCnt_diff'] <= FNCT_DIFF_MAX]
     nb_records_maxfnctdiff = len(pd_all_flows)
-    logger_flow.info("\t\t> removed "+ str(nb_records_minpkts - nb_records_maxfnctdiff) + " flows with a toot high fnctdiff (>=" + str(FNCT_DIFF_MAX) + ")" )
+    logger_flow.info("\t\t> removed "+ str(nb_records_minpkts - nb_records_maxfnctdiff) + " flows with a too high fnctdiff (>=" + str(FNCT_DIFF_MAX) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " flows to process")
 
+        
+   
     
-
- 
-
-    # --- plots ---
+    # --- plots per flow ---
     
     #PRR (fcnt diff between consecutive packets)
     plot_PRR_distrib(pd_all_flows)
@@ -411,8 +442,14 @@ if __name__ == "__main__":
     #pairplot SF / PRR for all packets (flows are used to estimate the PRR)
     plot_SF_PRR(pd_all_flows)
     
-    # time distribution of the packet losses
-    plot_PRR_timedistrib(pd_all_flows)
+    # correlation nb_dups / PRR
+    plot_nbdups_prr(pd_all_flows)
+    exit(10)
+    
+    
+  
+    # --- plots few flows ---
+ 
     
     # plot a grid of distributions (randomly selected flows)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
@@ -423,6 +460,11 @@ if __name__ == "__main__":
     #info
     logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time_ms'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
     
+  
+  
+  
+  
+    # --- plots inter packet times ---
 
     # plot the EDCF of the median inter packet time (remove samples with not enough packets)
     plot_interpkt_ecdf(
@@ -440,4 +482,5 @@ if __name__ == "__main__":
 
     #correlation between inter pkt time / nb packets
     plot_interpkt_nbpkts(pd_all_flows[['mean_fCnt_diff', 'median_fCnt_diff', 'max_fCnt_diff', 'median_interpkt_time_ms', 'nb_pkts']])
+
 
