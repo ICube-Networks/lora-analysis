@@ -37,6 +37,7 @@ import numpy as np
 # format
 import requests, json, os, tarfile, pathlib
 import matplotlib.dates as mdates
+from datetime import datetime
 
 # Import seaborn
 import seaborn as sns
@@ -241,13 +242,105 @@ def plot_traffic_per_hour(clientES):
 
 
 
+
+def  es_query_traffic_evolution():
+    """Elastic search query for an histogram.
+    
+    This function sends a query to an elastic search server  to retrieve an histogram (per week) of the number of packets 
+    
+    :returns: a pandas DataFrame which contains the counts for each window of the histogram
+    :rtype: DataFrame
+    """
+
+    #open the connection
+    clientES = tools.elasticsearch_open_connection()
+
+    #get the number of valid records per SF per channel
+    resp = clientES.options(
+        basic_auth=(myconfig.user, myconfig.password),
+    ).search(
+        index=myconfig.index_name,
+        size=0,
+        query=tools.queries.QUERY_ALL_NODUP,
+        aggs={
+            "SF": {
+                "terms" : { "field" : "txInfo.modulation.keyword" },
+                "aggregations": {
+                    "date": {
+                        "date_histogram" : {
+                            "field" : "rxInfo.time",
+                            "calendar_interval": "week",
+                            "format": "yyy-MM-dd",
+                            "time_zone": "Europe/Paris"
+                        }
+                    },
+                },
+            },
+         }
+    )
+
+            
+    
+
+    results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("SF", "date"), key_as_string=True, )
+    dtime = datetime(2020, 9, 1, 20)
+    results_df = results_df[results_df['date'] > dtime.timestamp()]
+    results_df = results_df[results_df['count'] > 0]
+    results_df['date'] = pd.to_datetime(results_df['date'], unit='ms')
+
+    return(results_df)
+
+
+def plot_traffic_evolution(results_df):
+    """Plot the traffic evolution.
+    
+    This function plots the histogram of the LoRa traffic per week all along the dataset.
+    
+    :param pandas dataFrame containing the histogram
+    """
+
+
+    # Create a seaborn visualization
+    sns.set()
+    sns.set_theme()
+    g = sns.relplot(
+        data=results_df,
+        kind="line",
+        x="date", y="count",
+        palette="tab10",
+    )
+
+    # common
+    axes = g.axes.flat[0]
+    g.set(xlabel='Date', ylabel='Number of packets per day')
+    g.set(ylim=(0, None))
+
+    # formating dates: autoformatter to convert the whole duration into something human friendly, with the right size for the xlabel
+    locator = mdates.AutoDateLocator()
+    formatter = mdates.ConciseDateFormatter(locator)
+    axes.xaxis.set_major_locator(locator)
+    axes.xaxis.set_major_formatter(formatter)
+    axes.margins(x=0)
+
+    # save the figure
+    fig = g.figure.savefig("figures/traffic_evolution.pdf")
+
+ 
+
+
+
 # executable
 if __name__ == "__main__":
     """Executes the script to plot the distribution of the number of packets per day of the week and per hour
  
     """
 
-        
+    #elastic search query, transformed in a panda dataFrame
+    results_df = es_query_traffic_evolution()
+    print(results_df)
+    plot_traffic_evolution(results_df)
+    
+    
     # open the connection to the elastic search server
     clientES = tools.elasticsearch_open_connection()
 
@@ -255,5 +348,6 @@ if __name__ == "__main__":
     plot_traffic_per_dayofweek(clientES)
     plot_traffic_per_hour(clientES)
     
+  
     
     clientES.transport.close()

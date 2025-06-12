@@ -150,6 +150,8 @@ def plot_SF(results_df):
 
 
 
+
+
 # executable
 if __name__ == "__main__":
     """Executes the script to plot the histogram of the number of packets per SF
@@ -163,7 +165,6 @@ if __name__ == "__main__":
     
     #plot it
     plot_SF(results_df)
-    
 
 
 

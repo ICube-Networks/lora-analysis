@@ -156,7 +156,7 @@ def  es_query_packets_list_random():
 
 
 
-def plot_SF_SNR_RSSI(results_df):
+def plot_SF_SNR_RSSI(results_df, figname):
     """Plot the SF distribution.
     
     This function plots the pairplot (correlation) of the different fields.
@@ -180,7 +180,7 @@ def plot_SF_SNR_RSSI(results_df):
   
 
     # save the figure
-    fig = g.figure.savefig("figures/linkqual_pairplots.pdf")
+    fig = g.figure.savefig(figname)
     g.figure.clf()
 
  
@@ -203,5 +203,7 @@ if __name__ == "__main__":
     logger_quality_corr.info(results_df)
     
     #pairplot for the multiple linkqual indicators
-    plot_SF_SNR_RSSI(results_df)
+    plot_SF_SNR_RSSI(results_df[['rssi', 'loRaSNR']], "figures/linkqual_rssi_snr_pairplots.pdf")
     
+    #pairplot for the multiple linkqual indicators
+    plot_SF_SNR_RSSI(results_df[['loRaSNR', 'channel', 'spreadingFactor']], "figures/linkqual_snr_channel_SF_pairplots.pdf")
