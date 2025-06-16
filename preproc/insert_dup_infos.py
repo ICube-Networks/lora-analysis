@@ -151,7 +151,7 @@ def get_nodupinfo_phyPayload_list():
  
     response = clientES.search(
         index=myconfig.index_name,
-        size=tools.queries.QUERY_NB_RESULT,
+        size=0, #tools.queries.QUERY_NB_RESULT,
         request_cache=False,
         source=False,
         query={
@@ -162,27 +162,35 @@ def get_nodupinfo_phyPayload_list():
             }
         },
         aggs={
-            "phyPayload" : {
-                "terms": { "field" : "phyPayload.keyword"},
+            "list" : {
+                "composite": {
+                    "size": 1000,
+                    "sources" : [
+                        { "phyPayload": { "terms": { "field": "phyPayload.keyword" } } }
+                #"terms": { "field" : "phyPayload.keyword"},
+                    ]
+                },
                 "aggs":{
-                     "min_mqtt_time": {
-                        "min" : { "field" : "mqtt_time" }
+                        "min_mqtt_time": {
+                            "min" : { "field" : "mqtt_time" }
+                        }
                     }
-                }
             }
         }
     )
-    
     clientES.transport.close()
     
     # result
     phyPayload_list = []
-    for elem in response['aggregations']['phyPayload']['buckets']:
+    for elem in response['aggregations']['list']['buckets']:
         result = {}
-        result['phyPayload']= elem['key']
+        result['phyPayload']= elem['key']['phyPayload']
         result['doc_count'] = elem['doc_count']
         result['mqtt_time'] = elem['min_mqtt_time']['value_as_string']
         phyPayload_list.append(result)
+        print(result)
+        exit(4)
+        
     #NB: the list may be empty if the query does not return any result
     return(phyPayload_list)
         
@@ -191,11 +199,11 @@ def get_nodupinfo_phyPayload_list():
 
 
 #return all the packets with the corresponding payload, and a larger MQTT TIME
-def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
+def get_packets_with_payloads_mqtt_min(phyPayload_min, payload_max, mqtt_time_min):
     """
     Returns the packets with the corresponding phyPayload and a time >= mqtt_time_min - OFFSET_MINUTES_MAX
   
-    :param phyPayload: the phyPayload to collect
+    :param phyPayload_min and max: the min and max phyPayloads to collect (lexicographically)
 
     :param mqtt_time_min: the mqtt_time_min to read
 
@@ -214,9 +222,12 @@ def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
                     {"range": {
                         "mqtt_time": {
                             "gte": mqtt_time_min
+                        },
+                        "phyPayload":{
+                           "gte": phyPayload_min,
+                           "lte": payload_max
                         }
-                    }},
-                    {"match": {"phyPayload": phyPayload}}
+                    }}
                 ]
             }
         },
@@ -268,7 +279,7 @@ if __name__ == "__main__":
             
             # for each phyPayload, process per mqtt_time
             while True:
-                response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], mqtt_time_min)
+                response = get_packets_with_payloads_mqtt_min(phyPayload_info['phyPayload'], phyPayload_info['phyPayload'], mqtt_time_min)
                
                 # add the is_duplicate field to each entry of this response
                 bulk_update = create_updated_entries(response['hits']['hits'])
@@ -276,7 +287,7 @@ if __name__ == "__main__":
                 #push the update
                 if len(bulk_update) > 0 :
                     logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
-                    tools.elasticsearch_push_updates(bulk_update)
+                    #tools.elasticsearch_push_updates(bulk_update)
                     logger_dup.info("\t\t... pushed ")
                 else:
                     logger_dup.info("\t\tNo update in this window (" + phyPayload_info['phyPayload'] + ")")
