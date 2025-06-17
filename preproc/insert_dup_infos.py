@@ -305,7 +305,7 @@ if __name__ == "__main__":
                 #push the update
                 if len(bulk_update) > 0 :
                     logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
-                    #tools.elasticsearch_push_updates(bulk_update)
+                    tools.elasticsearch_push_updates(bulk_update)
                     logger_dup.info("\t\t... pushed ")
                 else:
                     logger_dup.info("\t\tNo update in this window (" + phyPayload_info['phyPayload'] + ")")
