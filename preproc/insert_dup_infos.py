@@ -240,6 +240,46 @@ def get_packets_with_payloads_mqtt_min(phyPayload_min, payload_max, mqtt_time_mi
     return(response)
 
 
+
+#return all the packets with the corresponding payload, and a larger MQTT TIME
+def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
+    """
+    Returns the packets with the corresponding phyPayloadS 
+  
+    :param phyPayload_min and max: the min and max phyPayloads to collect (lexicographically)
+
+    :param mqtt_time_min: the mqtt_time_min to read
+
+    """
+
+    # to detect all the duplicates, shift the mqtt_time_min in the past!
+    mqtt_time_min = (datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) - timedelta(minutes=OFFSET_MINUTES_MAX)).strftime(tools.time.DATE_FORMAT_ELASTICSEARCH)
+
+    #all the fields for THIS payload, ranked by the mqtt_time
+    response = clientES.search(
+        index=myconfig.index_name,
+        size=tools.queries.QUERY_NB_RESULT,
+        query={
+            "bool": {
+                "must" : [
+                    {"range": {
+                        "mqtt_time": {
+                            "gte": mqtt_time_min
+                        }
+                    }},
+                    {"match": {"phyPayload": phyPayload}}
+                ]
+            }
+        },
+        pretty=True,
+        human=True,
+        #sort them chronologically
+        sort=["mqtt_time"],
+    )
+    
+    return(response)
+
+
 ############################################################
 #   SEARCH for records without dup_infos to update them
 ############################################################
@@ -274,30 +314,35 @@ if __name__ == "__main__":
                 
         # for each payload in the list
         for phyPayload_info in phyPayload_list :
+            #info
+            logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " nb_docs=" + str(phyPayload_info['doc_count']))
+            
             #logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " doc_count=" + str(phyPayload_info['doc_count']) + " (total=" + str(count_pkts) + "), mintime=" + mqtt_time_min)
 
             # earliest mqtt_time
-            if mqtt_time_min == "" or datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) >  datetime.strptime(tools.time.fixMicroseconds(phyPayload_info['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH):
-                mqtt_time_min = phyPayload_info['mqtt_time']
+            #if mqtt_time_min == "" or datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) >  datetime.strptime(tools.time.fixMicroseconds(phyPayload_info['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH):
+            #    mqtt_time_min = phyPayload_info['mqtt_time']
             
             #min payload
-            if payload_min == "" :
-                payload_min = phyPayload_info['phyPayload']
+            #if payload_min == "" :
+            #    payload_min = phyPayload_info['phyPayload']
             
             # number of packets
-            count_pkts = count_pkts + phyPayload_info['doc_count']
-            if (count_pkts < tools.queries.QUERY_NB_RESULT/2):
-                continue
+            #count_pkts = count_pkts + phyPayload_info['doc_count']
+            #if (count_pkts < tools.queries.QUERY_NB_RESULT/2):
+            #    continue
             
             #payload max
-            payload_max = phyPayload_info['phyPayload']
+            #payload_max = phyPayload_info['phyPayload']
            
             #info
-            logger_dup.info("\t> phyPayload_min=" + payload_min + " max=" + payload_max + " doc_count=" + str(count_pkts))
+            #logger_dup.info("\t> phyPayload_min=" + payload_min + " max=" + payload_max + " doc_count=" + str(count_pkts))
 
             # now processs the batch
+            mqtt_time_min = mqtt_time_min = phyPayload_info['mqtt_time']
             while True:
-                response = get_packets_with_payloads_mqtt_min(payload_min, payload_max, mqtt_time_min)
+                #response = get_packets_with_payloads_mqtt_min(payload_min, payload_max, mqtt_time_min)
+                response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], mqtt_time_min)
                 
                 # add the is_duplicate field to each entry of this response
                 bulk_update = create_updated_entries(response['hits']['hits'])
@@ -316,9 +361,9 @@ if __name__ == "__main__":
                 #no remaining response -> return in the main loop
                 if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
                     logger_dup.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_info['phyPayload'])
-                    count_pkts = 0
-                    payload_min = ""
-                    mqtt_time_min = ""
+                    #count_pkts = 0
+                    #payload_min = ""
+                    #mqtt_time_min = ""
                     break
 
                 # next min mqtt time
