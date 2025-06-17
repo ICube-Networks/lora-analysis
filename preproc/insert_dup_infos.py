@@ -188,8 +188,6 @@ def get_nodupinfo_phyPayload_list():
         result['doc_count'] = elem['doc_count']
         result['mqtt_time'] = elem['min_mqtt_time']['value_as_string']
         phyPayload_list.append(result)
-        print(result)
-        exit(4)
         
     #NB: the list may be empty if the query does not return any result
     return(phyPayload_list)
