@@ -208,41 +208,47 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
     :rtype: elastic search json response + string
     """
 
-    clientES = tools.elasticsearch_open_connection()
+    try:
+        clientES = tools.elasticsearch_open_connection()
+ 
+        response = clientES.search(
+            index=myconfig.index_name,
+            size=tools.queries.QUERY_NB_RESULT,
+            pretty=True,
+            human=True,
+            query={
+                "bool": {
+                    "filter" : [
+                        
+                        #{"term": {"dup_infos.is_duplicate": False}},
+                        {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
+                        {"term": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
+                    ],
+                    "must": [
+                        { "exists": { "field": "dup_infos"  }  }
+                    ]
+                }
+            },
+            fields=[
+                "mqtt_time",
+                "extra_infos.phyPayload.macPayload.fhdr.fCnt",
+                "_id",
+                "phyPayload",
+                "dup_infos.copy_of",
+                "dup_infos.is_duplicate",
+                "txInfo.loRaModulationInfo.spreadingFactor"
+            ],
+            sort=[
+                "mqtt_time",
+            ],
+            search_after=[mqtt_time_min],
+            source = False
+        )
+    
+    except:
+        self.terminated = True
+        return(None, None)
 
-    response = clientES.search(
-        index=myconfig.index_name,
-        size=tools.queries.QUERY_NB_RESULT,
-        pretty=True,
-        human=True,
-        query={
-            "bool": {
-                "filter" : [
-                    
-                    #{"term": {"dup_infos.is_duplicate": False}},
-                    {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
-                    {"term": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
-                ],
-                "must": [
-                    { "exists": { "field": "dup_infos"  }  }
-                ]
-            }
-        },
-        fields=[
-            "mqtt_time",
-            "extra_infos.phyPayload.macPayload.fhdr.fCnt",
-            "_id",
-            "phyPayload",
-            "dup_infos.copy_of",
-            "dup_infos.is_duplicate",
-            "txInfo.loRaModulationInfo.spreadingFactor"
-        ],
-        sort=[
-            "mqtt_time",
-        ],
-        search_after=[mqtt_time_min],
-        source = False
-    )
     
     # dump the json response for debug (VERY verbose !!)
     #logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
@@ -281,6 +287,8 @@ def eq_query_get_interpkt(devAddr):
         #send the elastic search query to the server
         response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
         logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
+        if response is None:
+            return(None)
         
         #no remaining response
         length = len(response["hits"])
@@ -390,9 +398,7 @@ def eq_query_get_interpkt(devAddr):
                     logger_preprocflow.critical(response)
                     logger_preprocflow.critical("id="+ response[index]['_id'])
                     exit(7)
-                    
-#110c5a7a
-    
+      
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
             break
@@ -586,6 +592,10 @@ class Application:
         
         """
         self.terminated = True
+        
+       
+
+        
         
         
   
