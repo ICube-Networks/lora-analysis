@@ -145,14 +145,15 @@ def es_query_get_devAddr():
         
         # add the corresponding devAddr in the list
         for record in response["aggregations"]["devAddr"]["buckets"]:
-            list_devAddr.append(record["key"])
+            list_devAddr.append({"devAddr" : record["key"], "doc_count": record["doc_count"]})
   
    
     # end of extraction
     logger_preprocflow.info("\t> Found " + str(len(list_devAddr)) + " different devAddrs")
    
     #result
-    return(list_devAddr)
+    devaddr_df = pd.DataFrame(list_devAddr)
+    return(devaddr_df)
  
    
 #create a record for this flow
@@ -606,8 +607,8 @@ class Application:
             
         
         #get the list of devaddrs in the elastic search DB
-        list_devAddr_pending = es_query_get_devAddr()
-        #print(list_devAddr_pending)
+        devAddr_pending_df = es_query_get_devAddr()
+        #print(devAddr_pending_df)
         
         # empty pandas dataframe (none read from the disk) -> let's create it
         if self.pd_all_flows.empty is True:
@@ -620,24 +621,33 @@ class Application:
             devAddr_proc = self.pd_all_flows['devAddr'].drop_duplicates()
           
             logger_preprocflow.info(str(len(devAddr_proc)) + " devAddr already processed and saved in local:")
-            logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
            
-            for devAddr in devAddr_proc:
-                list_devAddr_pending.remove(devAddr)
+            #for debuging
+            if (logger_preprocflow.getEffectiveLevel() <= logging.DEBUG):
+                logger_preprocflow.debug("\tdevAddr\t\tNb flows\tNb pkts")
+            
+                for devAddr in devAddr_proc:
+                    #remove the corresponding row
+                    #devAddr_pending_df = devAddr_pending_df[devAddr_pending_df['devAddr'].ne(devAddr)]
                 
-                if (logger_preprocflow.getEffectiveLevel() >= logging.DEBUG):
                     pd_records = load_distribs_forDevAddr_from_disk(self.pd_all_flows, devAddr, [], verbose=False)
                       
-                    logger_preprocflow.info("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
+                    logger_preprocflow.debug("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
                     logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
-
+            
+            #drop the devAddr already processed from the dataframe
+            index_drops = devAddr_pending_df['devAddr'].isin(devAddr_proc).index
+            logger_preprocflow.info("\t> " + str(len(index_drops)) + " to drop")
+            devAddr_pending_df.drop(index_drops, inplace = True)
+            logger_preprocflow.info("\t> ... dropped")
+ 
       
 
         #get the inter packet times for a given devAddr
-        logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(list_devAddr_pending)) +" )")
+        logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(devAddr_pending_df)) +" )")
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
     
-        for devAddr in list_devAddr_pending :
+        for devAddr in devAddr_pending_df['devAddr'] :
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)

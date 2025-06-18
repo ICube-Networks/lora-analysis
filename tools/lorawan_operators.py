@@ -2,12 +2,13 @@
 
 """ LoRaWAN Operators """
 
-import csv
+import csv, os
 
 def load_operators_csv():
     """ Load operators file """
+     
     operators = []
-    with open('operators_prefix.csv') as csvfile:
+    with open(os.path.dirname(__file__)+'/operators_prefix.csv') as csvfile:
         reader = csv.DictReader(csvfile, delimiter='\t')
         for row in reader:
             #print row
@@ -40,4 +41,4 @@ def find_operators(operators, devaddr):
 if __name__ == '__main__':
     OPERATORS = load_operators_csv()
     #print OPERATORS
-    print find_operators(OPERATORS, "1ddec524")
+    print(find_operators(OPERATORS, "1ddec524"))
