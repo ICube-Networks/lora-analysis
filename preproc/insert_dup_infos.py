@@ -380,9 +380,9 @@ if __name__ == "__main__":
                         mqtt_time_min = ""
                     break
 
-                # next min mqtt time
+                # next min payload & mqtt time
                 mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
-           
+                payload_min = response['hits']['hits'][-1]['_source']['phyPayload']
 
         
     clientES.transport.close()
