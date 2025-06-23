@@ -144,9 +144,8 @@ def plot_pkt_per_devaddr():
         results_df = es_query_count_for_field(params=params)
         print(results_df)
         
-        
-        str = params['fieldname2']
-        print(str)
+
+        logger_devaddr.info("Processing " + params['fieldname2'])
         
         # Create a seaborn visualization
         sns.set()

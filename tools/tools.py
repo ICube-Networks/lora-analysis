@@ -156,6 +156,71 @@ def elasticsearch_agg_into_dataframe(es_reply, agg_names, field_values="", key_a
     return(results_df)
 
 
+
+
+
+
+############################################################
+#           GENERIC QUERIES
+############################################################
+
+
+def elasticsearch_query_count_docs_with_twofields(fieldnames):
+    """ Elastic search query for a double aggregate query.
+    
+    This function sends a query to an elastic search server to retrive the doc counts for two field values (fieldname1 and fieldname2), and returns the corresponding pandas DataFrame    
+    
+    :param dictionary params: a list of two field names (with the keys fieldname1 and fieldname2) to construct the elastic search query
+    
+    :returns: a pandas DataFrame which contains the count numbers for each fields in the params variable (hierarchical aggregate)
+    :rtype: DataFrame
+    """
+
+    clientES = elasticsearch_open_connection()
+
+    #get the number of valid records per day of the week
+    resp = clientES.options(
+        basic_auth=(myconfig.user, myconfig.password)
+    ).search(
+        index=myconfig.index_name,
+        size=0,
+        pretty=True,
+        human=True,
+        query=queries.QUERY_EXTRAINFO_EXIST_NODUP,
+        aggs={
+            fieldnames['fieldname1']:{
+                "terms": {
+                    "field": fieldnames['fieldname1']
+                },
+                "aggs":{
+                    fieldnames['fieldname2']:{
+                        "terms" :{
+                            "field" : fieldnames['fieldname2']
+                        }
+                    }
+                }
+            }
+        }
+    )
+       
+    # transform the aggregation results into a pandas' dataframe
+    results_df = elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(fieldnames['fieldname1'], fieldnames['fieldname2']), key_as_string=False)
+    
+    # close the elastic connection
+    clientES.transport.close()
+    
+    if results_df.empty:
+        logger.critical("Empty pandaframe")
+        exit(2)
+    
+    #result
+    return(results_df)
+ 
+ 
+
+
+
+
 ############################################################
 #           TIME
 ############################################################
@@ -228,7 +293,7 @@ class queries:
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
                     { "exists": {"field": "extra_infos" }},
-                    {"match": {"rxInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation": "LORA"}},
               ]
             }
         }
