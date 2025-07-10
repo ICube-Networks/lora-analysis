@@ -62,7 +62,7 @@ OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the 
 
 # BATCH_FULL = query with a min and max payload
 # BATCH_FULL False = batch to get the list of payloads, but then process individually each payload
-BATCH_FULL=True
+BATCH_FULL=False
 
 
 ############################################################
@@ -171,7 +171,6 @@ def get_nodupinfo_phyPayload_list():
                     "size": tools.queries.QUERY_NB_RESULT,
                     "sources" : [
                         { "phyPayload": { "terms": { "field": "phyPayload.keyword" } } }
-                #"terms": { "field" : "phyPayload.keyword"},
                     ]
                 },
                 "aggs":{
@@ -180,7 +179,8 @@ def get_nodupinfo_phyPayload_list():
                         }
                     }
             }
-        }
+        },
+        sort=["phyPayload.keyword", "mqtt_time"],
     )
     clientES.transport.close()
     
@@ -217,6 +217,7 @@ def get_packets_with_payloads_mqtt_min(phyPayload_min, payload_max, mqtt_time_mi
     #all the fields for THIS payload, ranked by the mqtt_time
     response = clientES.search(
         index=myconfig.index_name,
+        request_cache=False,
         size=tools.queries.QUERY_NB_RESULT,
         query={
             "bool": {
@@ -263,6 +264,7 @@ def get_packets_with_payload_mqtt_min(phyPayload, mqtt_time_min):
     response = clientES.search(
         index=myconfig.index_name,
         size=tools.queries.QUERY_NB_RESULT,
+        request_cache=False,
         query={
             "bool": {
                 "must" : [
@@ -324,9 +326,11 @@ if __name__ == "__main__":
                 #logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " doc_count=" + str(phyPayload_info['doc_count']) + " (total=" + str(count_pkts) + "), mintime=" + mqtt_time_min)
 
                 # earliest mqtt_time
+                logger_dup.info("\t> " + phyPayload_info['mqtt_time'] + " <? " + mqtt_time_min + " payload="+ phyPayload_info['phyPayload']  + " nb_docs="+ str(phyPayload_info['doc_count']))
                 if mqtt_time_min == "" or datetime.strptime(tools.time.fixMicroseconds(mqtt_time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) >  datetime.strptime(tools.time.fixMicroseconds(phyPayload_info['mqtt_time']), tools.time.DATE_FORMAT_ELASTICSEARCH):
                     mqtt_time_min = phyPayload_info['mqtt_time']
-            
+                
+                
                 #min payload
                 if payload_min == "" :
                     payload_min = phyPayload_info['phyPayload']
@@ -349,11 +353,11 @@ if __name__ == "__main__":
             
            
             # now processs the batch
-            mqtt_time_min = mqtt_time_min = phyPayload_info['mqtt_time']
             while True:
                 if BATCH_FULL:
                     response = get_packets_with_payloads_mqtt_min(payload_min, payload_max, mqtt_time_min)
                 else:
+                    mqtt_time_min = phyPayload_info['mqtt_time']
                     response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], mqtt_time_min)
                 
                 # add the is_duplicate field to each entry of this response
@@ -361,7 +365,10 @@ if __name__ == "__main__":
 
                 #push the update
                 if len(bulk_update) > 0 :
-                    logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
+                    if BATCH_FULL:
+                          logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload_min="+ payload_min + " phyPayload_max="+ payload_max + " mqtt_min=" + mqtt_time_min + ")")
+                    else:
+                        logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_info['phyPayload'] + " mqtt_min=" + mqtt_time_min + ")")
                     tools.elasticsearch_push_updates(bulk_update)
                     logger_dup.info("\t\t... pushed ")
                 else:
