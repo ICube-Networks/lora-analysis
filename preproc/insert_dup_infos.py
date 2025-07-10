@@ -387,9 +387,12 @@ if __name__ == "__main__":
                         mqtt_time_min = ""
                     break
 
-                # next min payload & mqtt time
-                mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
-                payload_min = response['hits']['hits'][-1]['_source']['phyPayload']
+                # next min payload & mqtt time (depending on the case)
+                if BATCH_FULL:
+                    payload_min = response['hits']['hits'][-1]['_source']['phyPayload']
+                else:
+                    mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
+                logger_dup.info(payload_min + " =?= " + response['hits']['hits'][-1]['_source']['mqtt_time'])
 
         
     clientES.transport.close()
