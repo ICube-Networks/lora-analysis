@@ -390,10 +390,10 @@ if __name__ == "__main__":
                 # next min payload & mqtt time (depending on the case)
                 if BATCH_FULL:
                     payload_min = response['hits']['hits'][-1]['_source']['phyPayload']
+                    #logger_dup.info(payload_min + " =?= " + response['hits']['hits'][-1]['_source']['mqtt_time'])
                 else:
                     mqtt_time_min = response['hits']['hits'][-1]['_source']['mqtt_time']
-                logger_dup.info(payload_min + " =?= " + response['hits']['hits'][-1]['_source']['mqtt_time'])
-
+                    
         
     clientES.transport.close()
     exit(0)
