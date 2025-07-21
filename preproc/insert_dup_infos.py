@@ -347,6 +347,7 @@ if __name__ == "__main__":
                 logger_dup.info("\t> phyPayload_min=" + payload_min + " max=" + payload_max + " doc_count=" + str(count_pkts)+ ", batch mode")
             # no bacth full (process individually each payload, not in batch mode)
             else:
+                mqtt_time_min = phyPayload_info['mqtt_time']
             
                 #info
                 logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " nb_docs=" + str(phyPayload_info['doc_count'])+ ", nobatch mode")
@@ -357,7 +358,7 @@ if __name__ == "__main__":
                 if BATCH_FULL:
                     response = get_packets_with_payloads_mqtt_min(payload_min, payload_max, mqtt_time_min)
                 else:
-                    response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], phyPayload_info['mqtt_time'])
+                    response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], mqtt_time_min)
                 logger_dup.info("\t> response: " +  str(len(response['hits']['hits'])) + " records")
 
                 
