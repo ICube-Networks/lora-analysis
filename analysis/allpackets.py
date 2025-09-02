@@ -164,17 +164,27 @@ def plot_class_ack_distrib(data, fieldnames, figname):
         wedgeprops=dict(width=size, edgecolor='w')
         )
     acks = ['no ack', 'acks']
+    
+    
+    
     for i, p in enumerate(wedges):
         ang = (p.theta2 - p.theta1)/2. + p.theta1
         y = np.sin(np.deg2rad(ang))
         x = np.cos(np.deg2rad(ang))
         horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
-        connectionstyle = f"angle,angleA=0,angleB={ang}"
+        connectionstyle = f"arc3,rad=0." #angle,angleA=0,angleB={ang}"
         kw["arrowprops"].update({"connectionstyle": connectionstyle})
+       
+       
+       
+        print(acks[i % 2])
+        print(-0.2*np.sign(x))
+        print(y)
+        
         ax.annotate(
             acks[i % 2],
-            xy=(x, y),
-            xytext=(-0.1*np.sign(x), 0.5*y),
+            xy=(0.5*np.sign(x), 0.3*y+0.02),
+            xytext=(-0.1*np.sign(x), 1.5*y),
             horizontalalignment=horizontalalignment,
             **kw)
           
@@ -203,12 +213,13 @@ if __name__ == "__main__":
     # ------- Traffic ---------
     # class A/B, with and wo acks
     
+    
     param ={}
     fieldnames = { "fieldname1" : 'extra_infos.phyPayload.macPayload.fhdr.fCtrl.classB', "fieldname2": 'extra_infos.phyPayload.macPayload.fhdr.fCtrl.ack'}
     results_df = tools.elasticsearch_query_count_docs_with_twofields(fieldnames)
     plot_class_ack_distrib(results_df, fieldnames, "figures/allpackets_class_ack_distrib.pdf")
     
-    
+
 
     
     # ----- operator ---------
