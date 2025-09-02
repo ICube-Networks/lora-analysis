@@ -272,8 +272,9 @@ class queries:
      
     """
     
-    # max number of results for one query
-    QUERY_NB_RESULT = 10000
+    # parameters
+    QUERY_NB_RESULT = 10000             # max number of results for one query
+    CLUSTER_BUCKET_SIZE = 20000000      # max size of the bucket for agg queries (NB: all the existing devAddr possibly)
   
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST =  {

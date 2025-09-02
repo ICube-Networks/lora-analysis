@@ -15,7 +15,7 @@ extract the list of all the devAddrs)
 __authors__ = ("Fabrice Theoleyre")
 __contact__ = ("fabrice.theoleyre@cnrs.fr")
 __copyright__ = "CNRS"
-__date__ = "2023"
+__date__ = "2025"
 __version__= "1.0"
 
 
@@ -96,39 +96,57 @@ def es_query_get_devAddr():
 
     clientES = tools.elasticsearch_open_connection()
 
+    #increase the max bucket size (may be very large)
+    response = clientES.cluster.put_settings(
+        body=  {
+            "transient": {
+                "search.max_buckets": DEVADDR_COUNT_MAX
+            }
+        }
+    )
+
     #Until we have still devAddr to get
     pagination_count = 0
     list_devAddr = []
     while True:
-    
-        response = clientES.search(
-            index=myconfig.index_name,
-            size=0,
-            #request_timeout=3000,
-            pretty=True,
-            human=True,
-            query=tools.queries.QUERY_DATA_NODUP,
-            aggs={
-                'devAddr': {
-                    "terms": {
-                        "field": 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
-                        "size": DEVADDR_COUNT_MAX,
-                    },
-                    "aggs": {
-                        "devAddr_bucket_sort": {
-                            "bucket_sort": {
-                                "sort": [
-                                    {"_key": {"order": "asc"}}
-                                ],
-                                # "from" and "size" use above terms bucket size. It implements the pagination
-                                "from": pagination_count * AGG_OFFSET,
-                                "size": AGG_OFFSET
+
+        try:
+            response = clientES.search(
+                index=myconfig.index_name,
+                size=0,
+                request_timeout=3000,
+                pretty=True,
+                human=True,
+                query=tools.queries.QUERY_DATA_NODUP,
+                aggs={
+                    "devAddr": {
+                        "terms": {
+                            "field": "extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword",
+                            "size": DEVADDR_COUNT_MAX,
+                        },
+                        "aggs": {
+                            "devAddr_bucket_sort": {
+                                "bucket_sort": {
+                                    "sort": [
+                                        {"_key": {"order": "asc"}}
+                                    ],
+                                    "from": pagination_count * AGG_OFFSET,
+                                    "size": AGG_OFFSET
+                                }
                             }
                         }
                     }
                 }
-            }
-        )
+            )
+    
+        #exception in the ES query
+        except Exception as e:
+            print(e)
+            print(e.message)
+            print(e.meta)
+            print(e.body)
+            exit(66)
+        
         
         # for the next page
         pagination_count = pagination_count + 1
