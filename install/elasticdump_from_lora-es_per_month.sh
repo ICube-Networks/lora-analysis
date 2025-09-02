@@ -1,6 +1,6 @@
 #!/bin/bash
-# fait un dump par mois et année de la base de données elastic dump
-# nécessite d'avoir l'image docker elasticdump/elasticsearch-dump
+# dump per month per year for the elastic dump index
+# installs a docker contained (elasticdump/elasticsearch-dump) for this purpose
 
 # arguments verification
 usage() {
@@ -29,26 +29,29 @@ echo $DIR_RESULT
 #test directory
 [ -d "${DIR_RESULT}" ] || mkdir "${DIR_RESULT}"
 echo "Will store the dumps into ${DIR_RESULT}"
+    
+#index
+INDEX=lora_gateway_rx_v4
 
 
-
-# répertoire où stocker les fichiers json
+# years & months to process
 YEARS="2023"
 #YEARS="2020 2021 2022 2023"
-MONTHS="08"
+MONTHS="09 10 11 12"
 #MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
 
 #remove previous container in case of failure
 docker container inspect elasticdump && docker rm elasticdump
-        
-# se placer au bon endroit
+    
+     
+# right location
 cd $DIR_RESULT
 
 
-#for year in  2021
+#for year
 for year in $YEARS
 do
-    #for month in 10 11
+    #for month
     for month in $MONTHS
     do
         date="`echo $year`-`echo $month`"
@@ -62,14 +65,16 @@ do
         echo ""
         echo ""
 
+        # dump runnning the docker container
         docker run --name elasticdump --mount type=bind,source=${DIR_RESULT},target=/data --rm -ti elasticdump/elasticsearch-dump \
-            --input=http://lora-es.icube.unistra.fr:9200/lora_gateway_rx_v3 \
-            --output=/data/lora_gateway_rx_v3_data_`echo $date`.json \
+            --input=http://lora-es.icube.unistra.fr:9200/`echo $INDEX` \
+            --output=/data/`echo $INDEX`_data_`echo $date`.json \
             --type=data --limit=10000 --debug=yes \
-            --searchBody="{\"query\":{  \"range\": {\"mqtt_time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
-        
-        # je fais une version compressée!
-        tar -czvf lora_gateway_rx_v3_data_`echo $date`.json.tar.gz lora_gateway_rx_v3_data_`echo $date`.json
+            --searchBody="{\"query\":{  \"range\": {\"time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
+#            --searchBody="{\"query\":{  \"range\": {\"mqtt_time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
+
+        # I keep only the compressed version
+        tar -czvf `echo $INDEX`_data_`echo $date`.json.tar.gz `echo $INDEX`_data_`echo $date`.json
         
     done
 done
