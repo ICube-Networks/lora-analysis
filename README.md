@@ -80,10 +80,32 @@ We provide the following scripts to dump/load data in elastic search servers:
 
 * `elasticdump_load_data.sh` is a bash script to connect to the local installation and that injects the dump in the local elastic search instance (custom index name)
 
-* `elasticsearch_reindex.sh` is a bash script to reindex a v3/v4 lora index into the common index (that will be used for all the analysis)
 
+### Kibana
 
 You can explore the dataset in Kibana (cf. install section), by default: [http://IP@_ES_SERVER:5601/app/enterprise_search/content/search_indices/lora-index](http://IP@_ES_SERVER:5601/app/enterprise_search/content/search_indices/lora-index)
+
+
+
+
+
+## Elasticseacrh reindex
+
+
+Be careful, we have in our dataset two versions for the mapping (v3 and v4). The records do not present exactly the same fields. Thus, we have a script to reindex a dataset (version 3 or 4) into an outpupt index, mapping in particular the fields we used in the data analysis. In this way, we have a global index for all the years.
+
+* `elasticsearch_reindex.sh` is a bash script to reindex a v3/v4 lora index into the common index (that will be used for all the analysis)
+
+* The following fields differ between v3 and v4
+	* mqtt_time -> time
+	* txInfo.modulation -> txInfo.modulation.type (e.g. LoRa)
+	* loRaModulationInfo -> txInfo.modulation.lora
+	* rxInfo.gatewayID -> rxInfo.gatewayId
+	* rxInfo.uplinkID -> rxInfo.uplinkIdText
+		* ```Be careful:  uplinkID (v4) is a long, uplinkIDText (v3) is text!```
+	* codeRate -> change ```4/5``` (v3) into ```C_4_5``` (v4) to be consistent
+
+
 
 
 
