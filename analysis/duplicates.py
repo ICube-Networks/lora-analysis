@@ -81,7 +81,7 @@ def plot_nbdups_time_heatmap(pd_flat_values):
     """
     
     # extract the hour of the day
-    pd_flat_values['hour'] = pd.to_datetime(pd_flat_values['mqtt_time']).dt.hour
+    pd_flat_values['hour'] = pd.to_datetime(pd_flat_values['time']).dt.hour
     
     # grouby the two columns
     # unstack to transform into a 2D arrray, completing with zero for N/A values

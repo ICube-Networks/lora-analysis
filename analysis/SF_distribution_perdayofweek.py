@@ -82,7 +82,7 @@ def  es_query_SF():
         query=tools.queries.QUERY_ALL_NODUP,
         aggs={
             "SF": {
-                "terms" : { "field" : "txInfo.loRaModulationInfo.spreadingFactor" },
+                "terms" : { "field" : "txInfo.modulation.lora.spreadingFactor" },
                 "aggregations": {
                     "date": {
                         "date_histogram" : {
@@ -96,9 +96,6 @@ def  es_query_SF():
             },
          }
     )
-
-            
-    
 
     results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=("SF", "date"), key_as_string=True, )
     dtime = datetime(2020, 9, 1, 20)

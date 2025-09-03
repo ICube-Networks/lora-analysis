@@ -389,7 +389,7 @@ class queries:
                     {"match": {"rxInfo.crcStatus": "CRC_OK"}},
                     {
                         "range":{
-                            "mqtt_time":{
+                            "time":{
                                  "gte": "2020-09-01",
                                  #"lte": "2020-12-30",
                                  "format": "year_month_day",
@@ -406,12 +406,12 @@ class queries:
     QUERY_ALL_NODUP = {
             "bool": {
                 "filter": [
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
                     {"match": {"rxInfo.crcStatus": "CRC_OK"}},
                     {"match": {"dup_infos.is_duplicate": False}},
                     {
                         "range":{
-                            "mqtt_time":{
+                            "time":{
                                  "gte": "2020-09-01",
                                  "format": "year_month_day",
                             }

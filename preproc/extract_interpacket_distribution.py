@@ -215,14 +215,14 @@ def extract_flow_record(devAddr, fCnt_1st, fCnt_last, time_1st, time_last, pd_di
 
 
 
-def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
+def es_query_get_devAddr_tx(devAddr, time_min):
     """ Elastic query to get the list of inter packet time for a given devAddr
         
     :param devAddr: the devADDR to ask for
     
-    :param mqtt_time_min: the min mqqt_time in the query
+    :param time_min: the min mqqt_time in the query
         
-    :returns: the elastic search response + the next mqtt_time_min to ask for
+    :returns: the elastic search response + the next time_min to ask for
     
     :rtype: elastic search json response + string
     """
@@ -249,7 +249,7 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
                 }
             },
             fields=[
-                "mqtt_time",
+                "time",
                 "extra_infos.phyPayload.macPayload.fhdr.fCnt",
                 "_id",
                 "phyPayload",
@@ -258,9 +258,9 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
                 "txInfo.loRaModulationInfo.spreadingFactor"
             ],
             sort=[
-                "mqtt_time",
+                "time",
             ],
-            search_after=[mqtt_time_min],
+            search_after=[time_min],
             source = False
         )
     
@@ -274,9 +274,9 @@ def es_query_get_devAddr_tx(devAddr, mqtt_time_min):
 
     # next page for the query
     length = len(response["hits"]["hits"])
-    mqtt_time_min = response["hits"]["hits"][length-1]["fields"]["mqtt_time"][0]
+    time_min = response["hits"]["hits"][length-1]["fields"]["time"][0]
  
-    return(response, mqtt_time_min)
+    return(response, time_min)
     
     
 
@@ -294,8 +294,8 @@ def eq_query_get_interpkt(devAddr):
     # get the list of packets for this devAddr
     # -> data packets only (with a devAddr)
     # -> without duplicates
-    # -> ordered chronologically (by mqtt_time)
-    mqtt_time_min = 0
+    # -> ordered chronologically (by time)
+    time_min = 0
      
     #list of flows for this devAddr: empty (we will add a flow when we detect a new one)
     flows_for_thisDevAddr = []
@@ -304,7 +304,7 @@ def eq_query_get_interpkt(devAddr):
     while True:
     
         #send the elastic search query to the server
-        response, mqtt_time_min = es_query_get_devAddr_tx(devAddr, mqtt_time_min)
+        response, time_min = es_query_get_devAddr_tx(devAddr, time_min)
         logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
         if response is None:
             return(None)
@@ -369,7 +369,7 @@ def eq_query_get_interpkt(devAddr):
                                       
                     # update info of this flow
                     flow['epochtime_last'] = time_current
-                    flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)
+                    flow['time_last'] = datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH)
                     flow['fCnt_last'] = fCnt_current
 
                     # create a pandas record at the end of the distrib
@@ -378,7 +378,7 @@ def eq_query_get_interpkt(devAddr):
                         fCnt_difference,
                         fCnt_current,
                         current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0],
-                        datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                        datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH),
                         current_packet_data["fields"]["phyPayload"][0],
                         current_packet_data["fields"]["_id"][0],
                         0,                                        # not a duplicate
@@ -396,7 +396,7 @@ def eq_query_get_interpkt(devAddr):
                         'fCnt_diff' : [0],
                         'fCnt' : [fCnt_current],
                         'SF' : [current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0]],
-                        'mqtt_time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH)],
+                        'time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH)],
                         'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
                         '_id' : [current_packet_data["fields"]["_id"][0]],        #new flow, so cannot be a duplicated packet
                         'nb_duplicates' : [0]                                     #same reason
@@ -406,8 +406,8 @@ def eq_query_get_interpkt(devAddr):
                     flows_for_thisDevAddr.append({
                         'fCnt_1st': fCnt_current,
                         'fCnt_last': fCnt_current,
-                        'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
-                        'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["mqtt_time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                        'time_1st': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH),
+                        'time_last': datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH),
                         'epochtime_last': time_current,
                         'pd_distrib': pd.DataFrame(data=record)
                     })
@@ -525,7 +525,7 @@ def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib, verbos
     
     """
      
-    #get all the mqtt_time for theis devAddr
+    #get all the time for theis devAddr
     for time_1st in pd_all_flows[pd_all_flows['devAddr']== devAddr]['time_1st']:
     
         filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
@@ -543,7 +543,7 @@ def load_distribs_forDevAddr_and_time_1st_from_disk(devAddr, time_1st, verbose=F
         
     :param devAddr: the devAddr to read
     
-    :param time_1st: the mqtt_time (of the first packet of the flow) to read
+    :param time_1st: the time (of the first packet of the flow) to read
 
     :returns: the raw distribution (inter packet time + fCnt + etc.)
     

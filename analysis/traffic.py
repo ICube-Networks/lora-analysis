@@ -266,7 +266,7 @@ def  es_query_traffic_evolution():
         query=tools.queries.QUERY_ALL_NODUP,
         aggs={
             "SF": {
-                "terms" : { "field" : "txInfo.modulation.keyword" },
+                "terms" : { "field" : "txInfo.modulation.type.keyword" },
                 "aggregations": {
                     "date": {
                         "date_histogram" : {

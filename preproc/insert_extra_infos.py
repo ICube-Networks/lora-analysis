@@ -107,7 +107,7 @@ if __name__ == "__main__":
             }#,
             #sort them chronologically (just because it's convenient for debuging)
             #sort=[
-            #        {"mqtt_time": {"order": "asc"}},
+            #        {"time": {"order": "asc"}},
             #        {"_score": {"order": "desc"}},
             #]
         )
@@ -120,7 +120,7 @@ if __name__ == "__main__":
             break
         
         #extracts the mqtt-time of the last element to then scroll later
-        #last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['mqtt_time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
+        #last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
         LOGGER.info("       > " + str(length) + " records")
 
         # reinit the next bulk update query

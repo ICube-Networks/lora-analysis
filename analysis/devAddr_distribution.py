@@ -180,7 +180,7 @@ def es_query_devaddr_duration(operator, field_scope, field_value):
     
     :param dictionary field_scope: name of the elastic field to define classes (e.g., extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword to group the packets per devAddr)
     
-    :param dictionary field_value: name of the field where the operator is applied (e.g. mqtt_time to get the max or min time for a given class)
+    :param dictionary field_value: name of the field where the operator is applied (e.g. time to get the max or min time for a given class)
     
     :returns: a pandas DataFrame which contains the duration of all
     :rtype: DataFrame

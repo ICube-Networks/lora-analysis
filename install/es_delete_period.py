@@ -94,7 +94,7 @@ if __name__ == "__main__":
                 "filter": [
                     {
                         "range":{
-                            "mqtt_time":{
+                            "time":{
                                 "gte": DATE_MIN,
                                 "lte": DATE_MAX
                             }

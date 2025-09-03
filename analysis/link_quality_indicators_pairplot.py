@@ -84,7 +84,7 @@ def  es_query_packets_list_random():
                 "rxInfo.crcStatus",
                 "rxInfo.channel",
                 "txInfo.loRaModulationInfo.spreadingFactor",
-                "mqtt_time"
+                "time"
             ],
             search_after=[
                 minkey
@@ -94,8 +94,8 @@ def  es_query_packets_list_random():
                     "type": "number",
                     #index with a random double value
                     #"script": "Random r = new Random(); double value; value = r.nextDouble(); return(value);",
-                    #index with a hash of the PHY + mqtt_time (to have the same key each time)
-                    "script": "return(Math.abs(doc['phyPayload.keyword'].hashCode() + doc['mqtt_time'].hashCode()));",
+                    #index with a hash of the PHY + time (to have the same key each time)
+                    "script": "return(Math.abs(doc['phyPayload.keyword'].hashCode() + doc['time'].hashCode()));",
                     "order": "asc",
                 },
             }],
