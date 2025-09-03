@@ -69,6 +69,21 @@ echo ""
 echo ""
 echo "------ Reindexing from ${INDEX_NAME_INPUT} to ${INDEX_NAME_OUTPUT} --------"
 
-curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 3; ctx._source['"'"'time'"'"']  = ctx._source.remove('"'"'mqtt_time'"'"');  ctx._source.txInfo.type = ctx._source.txInfo.remove('"'"'modulation'"'"'); ctx._source.txInfo.modulation = [:]; ctx._source.txInfo.modulation.lora = ctx._source.txInfo.remove('"'"'loRaModulationInfo'"'"'); ctx._source.txInfo.modulation.type  = ctx._source.txInfo.remove('"'"'type'"'"'); ctx._source.txInfo.modulation.lora.codeRate = '"'"'C_'"'"' + ctx._source.txInfo.modulation.lora.codeRate.replace('"'"'/'"'"','"'"'_'"'"'); ctx._source.rxInfo.snr = ctx._source.rxInfo.remove('"'"'loRaSNR'"'"'); ctx._source.rxInfo.gatewayId = ctx._source.rxInfo.remove('"'"'gatewayID'"'"'); ctx._source.rxInfo.uplinkIdText = ctx._source.rxInfo.remove('"'"'uplinkID'"'"');"}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
 
+# version 3 -> mapping
+if [[ "$VERSION" -eq 3 ]];
+then
 
+    curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 3; ctx._source['"'"'time'"'"']  = ctx._source.remove('"'"'mqtt_time'"'"');  ctx._source.txInfo.type = ctx._source.txInfo.remove('"'"'modulation'"'"'); ctx._source.txInfo.modulation = [:]; ctx._source.txInfo.modulation.lora = ctx._source.txInfo.remove('"'"'loRaModulationInfo'"'"'); ctx._source.txInfo.modulation.type  = ctx._source.txInfo.remove('"'"'type'"'"'); ctx._source.txInfo.modulation.lora.codeRate = '"'"'C_'"'"' + ctx._source.txInfo.modulation.lora.codeRate.replace('"'"'/'"'"','"'"'_'"'"'); ctx._source.rxInfo.snr = ctx._source.rxInfo.remove('"'"'loRaSNR'"'"'); ctx._source.rxInfo.gatewayId = ctx._source.rxInfo.remove('"'"'gatewayID'"'"'); ctx._source.rxInfo.uplinkIdText = ctx._source.rxInfo.remove('"'"'uplinkID'"'"');"}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
+
+#version 4 -> reindex without any modification, only the src_version field
+elif [[ "$VERSION" -eq 4 ]];
+then
+
+    curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 4; "}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
+
+#else -> not supported
+else
+    echo "Only v3 and V4 are supported, not $VERSION"
+    exit 4
+fi
