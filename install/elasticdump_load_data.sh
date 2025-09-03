@@ -1,12 +1,16 @@
 # arguments verification
 usage() {
-    echo "Usage: $0 -d <directory to read the dumps>" 1>&2; exit 1;
+    echo "Usage: $0 -d <directory to read the dumps> -i <index_name>" 1>&2; exit 1;
 }
 
-while getopts ":d:" option; do
+while getopts ":d:i:" option; do
     case "${option}" in
         d)
             DIR_DUMPS=${OPTARG}
+            ;;
+        i)
+            #Force manually the index to use
+            INDEX_NAME=${OPTARG}
             ;;
         *)
             usage
@@ -18,11 +22,19 @@ if [ -z "${DIR_DUMPS}" ]; then
    usage
 fi
 
+
+
+
 #extract the parameters from the python file
-INDEX_NAME=`cat ../config/myconfig.py | grep "index_name" | cut -d '"' -f 2`
 USER=`cat ../config/myconfig.py | grep "user" | cut -d '"' -f 2`
 PASSWORD=`cat ../config/myconfig.py | grep "password" | cut -d '"' -f 2`
 HOSTNAME=`cat ../config/myconfig.py | grep "hostname" | cut -d '"' -f 2`
+# the index is not those used by the rest of the python scripts. We need first to reindex them (for ES mappings)
+# the index is specified in the CLI
+#`cat ../config/myconfig.py | grep "index_name" | cut -d '"' -f 2`
+
+
+
 
 #npm verification
 npm -v
