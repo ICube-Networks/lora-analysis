@@ -40,10 +40,11 @@ INDEX_NAME_OUTPUT=`cat ../config/myconfig.py | grep "index_name" | cut -d '"' -f
 
 
 echo "Reindexing from $INDEX_NAME_INPUT to $INDEX_NAME_OUTPUT"
+echo "Flush -> ${FLUSH} "
 
 
 # flush the previous index
-if ((FLUSH))
+if [ "${FLUSH}" -eq 1 ]
 then
     #insecure mode since this is a self-signed certificate in ES
 
@@ -69,15 +70,16 @@ echo ""
 echo ""
 echo "------ Reindexing from ${INDEX_NAME_INPUT} to ${INDEX_NAME_OUTPUT} --------"
 
+echo "version $VERSION "
 
 # version 3 -> mapping
-if [[ "$VERSION" -eq 3 ]];
+if [ "$VERSION" -eq 3 ]
 then
 
     curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 3; ctx._source['"'"'time'"'"']  = ctx._source.remove('"'"'mqtt_time'"'"');  ctx._source.txInfo.type = ctx._source.txInfo.remove('"'"'modulation'"'"'); ctx._source.txInfo.modulation = [:]; ctx._source.txInfo.modulation.lora = ctx._source.txInfo.remove('"'"'loRaModulationInfo'"'"'); ctx._source.txInfo.modulation.type  = ctx._source.txInfo.remove('"'"'type'"'"'); ctx._source.txInfo.modulation.lora.codeRate = '"'"'C_'"'"' + ctx._source.txInfo.modulation.lora.codeRate.replace('"'"'/'"'"','"'"'_'"'"'); ctx._source.rxInfo.snr = ctx._source.rxInfo.remove('"'"'loRaSNR'"'"'); ctx._source.rxInfo.gatewayId = ctx._source.rxInfo.remove('"'"'gatewayID'"'"'); ctx._source.rxInfo.uplinkIdText = ctx._source.rxInfo.remove('"'"'uplinkID'"'"');"}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
 
-#version 4 -> reindex without any modification, only the src_version field
-elif [[ "$VERSION" -eq 4 ]];
+#version 4 -> reindex without any modification, only the src_version field (v4)
+elif [ "$VERSION" -eq 4 ]
 then
 
     curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 4; "}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
