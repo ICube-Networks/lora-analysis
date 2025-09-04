@@ -22,12 +22,14 @@ if [ -z "${DIR_RESULT}" ]; then
    usage
 fi
 
-# absolute path (required later for elastic-dump)
-DIR_RESULT="`pwd`/${DIR_RESULT}"
-echo $DIR_RESULT
+# NB: absolute path (required later for elastic-dump)
+DIR_RESULT=`readlink -f ${DIR_RESULT}`
 
 #test directory
-[ -d "${DIR_RESULT}" ] || mkdir "${DIR_RESULT}"
+if [ ! -d "$DIR_RESULT" ]; then
+    echo "$DIR_RESULT is not an absolute path or the directory doesn't exist"
+    exit
+fi
 echo "Will store the dumps into ${DIR_RESULT}"
     
 #index
@@ -35,10 +37,10 @@ INDEX=lora_gateway_rx_v4
 
 
 # years & months to process
-YEARS="2024 2025"
+YEARS="2024 "
 #YEARS="2020 2021 2022 2023 2024 2025"
-#MONTHS="07"
-MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
+MONTHS="06 07 08 09 10 11 12"
+#MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
 
 #remove previous container in case of failure
 docker container inspect elasticdump && docker rm elasticdump
