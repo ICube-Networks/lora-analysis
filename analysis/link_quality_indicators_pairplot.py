@@ -80,10 +80,10 @@ def  es_query_packets_list_random():
             source=False,
             fields=[
                 "rxInfo.rssi",
-                "rxInfo.loRaSNR",
+                "rxInfo.snr",
                 "rxInfo.crcStatus",
                 "rxInfo.channel",
-                "txInfo.loRaModulationInfo.spreadingFactor",
+                "txInfo.modulation.lora.spreadingFactor",
                 "time"
             ],
             search_after=[

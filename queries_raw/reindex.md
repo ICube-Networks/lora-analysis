@@ -18,7 +18,7 @@ POST _reindex?wait_for_completion=false
             "bool": {
                 "filter": [{
                     "range":{
-                        "mqtt_time":{
+                        "time":{
                             "gte": "2020-10-01",
                             "lte": "2020-10-30" 
                         }
@@ -244,7 +244,7 @@ POST _reindex
         "filter": [
           {
             "range": {
-              "mqtt_time": {
+              "time": {
                 "gte": "2021-03-26T16:58:54.571867Z",
                 "lte": "2021-03-26T16:58:54.571867Z"
               }
@@ -258,7 +258,7 @@ POST _reindex
     "index": "lora-index-new"
   },
   "script": {
-    "source": "ctx._source['src_version'] = 3; ctx._source['time']  = ctx._source.remove('mqtt_time');  ctx._source.txInfo.type = ctx._source.txInfo.remove('modulation'); ctx._source.txInfo.modulation = [:]; ctx._source.txInfo.modulation.lora = ctx._source.txInfo.remove('loRaModulationInfo'); ctx._source.txInfo.modulation.type  = ctx._source.txInfo.remove('type'); ctx._source.txInfo.modulation.lora.codeRate = 'C_' + ctx._source.txInfo.modulation.lora.codeRate.replace('/','_'); ctx._source.devAddr = ctx._source.extra_infos.phyPayload.macPayload.fhdr.devAddr; ctx._source.mType = ctx._source.extra_infos.phyPayload.mhdr.mType; ctx._source.rxInfo.snr = ctx._source.rxInfo.remove('loRaSNR'); ctx._source.rxInfo.gatewayId = ctx._source.rxInfo.remove('gatewayID'); ctx._source.rxInfo.uplinkIdText = ctx._source.rxInfo.remove('uplinkID');"
+    "source": "ctx._source['src_version'] = 3; ctx._source['time']  = ctx._source.remove('time');  ctx._source.txInfo.type = ctx._source.txInfo.remove('modulation'); ctx._source.txInfo.modulation = [:]; ctx._source.txInfo.modulation.lora = ctx._source.txInfo.remove('loRaModulationInfo'); ctx._source.txInfo.modulation.type  = ctx._source.txInfo.remove('type'); ctx._source.txInfo.modulation.lora.codeRate = 'C_' + ctx._source.txInfo.modulation.lora.codeRate.replace('/','_'); ctx._source.devAddr = ctx._source.extra_infos.phyPayload.macPayload.fhdr.devAddr; ctx._source.mType = ctx._source.extra_infos.phyPayload.mhdr.mType; ctx._source.rxInfo.snr = ctx._source.rxInfo.remove('loRaSNR'); ctx._source.rxInfo.gatewayId = ctx._source.rxInfo.remove('gatewayID'); ctx._source.rxInfo.uplinkIdText = ctx._source.rxInfo.remove('uplinkID');"
   }
 }
 

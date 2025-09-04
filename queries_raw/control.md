@@ -80,7 +80,7 @@ GET /lora-index/_search?pretty=true
             "bool": {
                 "filter": [{
                     "range":{
-                        "mqtt_time":{
+                        "time":{
                             "gte": "2020-11-01"
                         }
                     }

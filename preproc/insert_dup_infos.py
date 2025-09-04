@@ -98,7 +98,7 @@ def create_updated_entries(response):
         if index >= 1:
             # Same info (NB: the records are sorted by <phyPayload, time>
             # Thus duplicates are contiguous
-            if (response[index-1]['_source']['phyPayload'] == response[index]['_source']['phyPayload']) and  (response[index-1]['_source']['txInfo']['loRaModulationInfo']['spreadingFactor'] == response[index]['_source']['txInfo']['loRaModulationInfo']['spreadingFactor']) and (response[index-1]['_source']['txInfo']['loRaModulationInfo']['bandwidth'] == response[index]['_source']['txInfo']['loRaModulationInfo']['bandwidth']) and (response[index-1]['_source']['txInfo']['loRaModulationInfo']['codeRate'] == response[index]['_source']['txInfo']['loRaModulationInfo']['codeRate']) and (response[index-1]['_source']['txInfo']['frequency'] == response[index]['_source']['txInfo']['frequency']):
+            if (response[index-1]['_source']['phyPayload'] == response[index]['_source']['phyPayload']) and  (response[index-1]['_source']['txInfo']['modulation']['lora']['spreadingFactor'] == response[index]['_source']['txInfo']['modulation']['lora']['spreadingFactor']) and (response[index-1]['_source']['txInfo']['modulation']['lora']['bandwidth'] == response[index]['_source']['txInfo']['modulation']['lora']['bandwidth']) and (response[index-1]['_source']['txInfo']['modulation']['lora']['codeRate'] == response[index]['_source']['txInfo']['modulation']['lora']['codeRate']) and (response[index-1]['_source']['txInfo']['frequency'] == response[index]['_source']['txInfo']['frequency']):
             
                 # compute the time difference between this record and the previous one
                 try:

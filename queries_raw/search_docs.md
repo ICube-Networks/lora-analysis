@@ -99,7 +99,7 @@ GET /lora-index/_search?pretty=true
 
 
 
-# phypayload + mqtt_time min
+# phypayload + time min
 
 ```
 
@@ -118,7 +118,7 @@ GET /lora-index/_search?pretty=true
       "must": [
           {
           "range": {
-            "mqtt_time": {
+            "time": {
               "gte": "2020-10-10T09:40:19.485088Z"
             }
           }
@@ -142,7 +142,7 @@ GET /lora-index/_search?pretty=true
 	      "filter": [
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2022-03-31",
 	                 "lte": "2022-04-30"            
 	
@@ -194,7 +194,7 @@ GET /lora-index/_search?pretty=true
       }
 	  },
       "sort" : [
-        { "mqtt_time" : "asc" }
+        { "time" : "asc" }
       ]
 	}
 	
@@ -224,12 +224,12 @@ GET /lora-index/_search?pretty=true
 	   "fields": [
           "extra_infos.phyPayload.macPayload.fhdr.devAddr",
           "phyPayload",
-          "mqtt_time",
+          "time",
           "extra_infos.phyPayload.macPayload.fhdr.fCnt"
       ],
       "_source": false,
       "sort" : [
-        { "mqtt_time" : "asc" }
+        { "time" : "asc" }
       ]
 	}
 	
@@ -248,7 +248,7 @@ GET /lora-index/_search?pretty=true
             "must" : [
                 {"match": {"phyPayload": "ALSSkTUnCNIMly0D/v9YF6jdJmlLtPg"}},
 				{"range":{
-	            	"mqtt_time":{
+	            	"time":{
 	                	"gte": "2021-03-25T20:48:13.590911Z"
 	            	}
 				}}

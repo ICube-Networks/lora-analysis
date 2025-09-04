@@ -8,12 +8,12 @@
 	    "day_of_week": {
 	      "type": "keyword",
 	      "script": {
-	        "source": "emit(doc['mqtt_time'].value.dayOfWeekEnum.getDisplayName(TextStyle.FULL, Locale.ROOT))"
+	        "source": "emit(doc['time'].value.dayOfWeekEnum.getDisplayName(TextStyle.FULL, Locale.ROOT))"
 	      }
 	    }
 	  },
 	  "properties": {
-	    "mqtt_time": {
+	    "time": {
 	      "type": "date"
 	    }
 	  }
@@ -29,12 +29,12 @@
 	    "hour": {
 	      "type": "keyword",
 	      "script": {
-	        "source": "Date date = new Date(doc['mqtt_time'].value) ; java.text.SimpleDateFormat format = new java.text.SimpleDateFormat('HH'); emit(format.format(date))  "
+	        "source": "Date date = new Date(doc['time'].value) ; java.text.SimpleDateFormat format = new java.text.SimpleDateFormat('HH'); emit(format.format(date))  "
 	      }
 	    }
 	  },
 	  "properties": {
-	    "mqtt_time": {
+	    "time": {
 	      "type": "date"
 	    }
 	  }
@@ -57,7 +57,7 @@ Defined with a dynamic mapping, directly in the query
 	        {"match": {"rxInfo.crcStatus": "CRC_OK"}},
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2020-11-01",
 	                 "lte": "2020-11-02"            
 	              
@@ -72,7 +72,7 @@ Defined with a dynamic mapping, directly in the query
 	      "type": "long",
 	      "script": {
 	        "source": """
-	         emit(doc['mqtt_time'].value.getHour());
+	         emit(doc['time'].value.getHour());
 	         """
 	      }
 	    }
@@ -100,7 +100,7 @@ Defined with a dynamic mapping, directly in the query
 	        {"match": {"rxInfo.crcStatus": "CRC_OK"}},
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2020-09-01",
 	                 "lte": "2020-10-30",
 	                 "format": "year_month_day"
@@ -132,7 +132,7 @@ Defined with a dynamic mapping, directly in the query
 	        {"match": {"rxInfo.crcStatus": "CRC_OK"}},
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2020-09-01",
 	                 "lte": "2020-10-30",
 	                 "format": "year_month_day"
@@ -145,7 +145,7 @@ Defined with a dynamic mapping, directly in the query
 	  "aggs": {
 	    "am-pm-count": {
 	      "terms": {
-	        "script": "return doc[\"mqtt_time\"].value.getHour() < 12 ? \"AM\" : \"PM\";"
+	        "script": "return doc[\"time\"].value.getHour() < 12 ? \"AM\" : \"PM\";"
 	      }
 	    }
 	  }
@@ -165,7 +165,7 @@ The day is the period comprised between 7am and 7pm
 	        {"match": {"rxInfo.crcStatus": "CRC_OK"}},
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2020-09-01",
 	                 "lte": "2020-10-30",
 	                 "format": "year_month_day"
@@ -178,7 +178,7 @@ The day is the period comprised between 7am and 7pm
 	  "aggs": {
 	    "day-night-count": {
 	      "terms": {
-	        "script": "return doc[\"mqtt_time\"].value.getHour() <= 7 || doc[\"mqtt_time\"].value.getHour() >= 19  ? \"night\" : \"day\";"
+	        "script": "return doc[\"time\"].value.getHour() <= 7 || doc[\"time\"].value.getHour() >= 19  ? \"night\" : \"day\";"
 	      }
 	    }
 	  }
@@ -237,10 +237,10 @@ List of first reception of a packet for each gateway ID
 	      "terms": {
 	        "field": "rxInfo.gatewayID.keyword",
 	        "size": 10000,
-	        "order": {"min_mqtt_time": "desc"}
+	        "order": {"min_time": "desc"}
 	      },
 	      "aggs":{
-	        "min_mqtt_time": {"min": {"field": "mqtt_time"}}
+	        "min_time": {"min": {"field": "time"}}
 	      }
 	    }
 	  }

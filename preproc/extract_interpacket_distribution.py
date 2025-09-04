@@ -239,7 +239,7 @@ def es_query_get_devAddr_tx(devAddr, time_min):
                 "bool": {
                     "filter" : [
                         
-                        #{"term": {"dup_infos.is_duplicate": False}},
+                        {"term": {"dup_infos.is_duplicate": False}},
                         {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
                         {"term": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
                     ],
@@ -255,7 +255,7 @@ def es_query_get_devAddr_tx(devAddr, time_min):
                 "phyPayload",
                 "dup_infos.copy_of",
                 "dup_infos.is_duplicate",
-                "txInfo.loRaModulationInfo.spreadingFactor"
+                "txInfo.modulation.lora.spreadingFactor"
             ],
             sort=[
                 "time",

@@ -77,12 +77,12 @@ def es_query_traffic_per_dayofweek(clientES):
         runtime_mappings={
             "day_of_week": {
                 "type": "keyword",
-                "script": { "source": "emit(doc['mqtt_time'].value.dayOfWeekEnum.getDisplayName(TextStyle.FULL, Locale.ROOT));" }
+                "script": { "source": "emit(doc['time'].value.dayOfWeekEnum.getDisplayName(TextStyle.FULL, Locale.ROOT));" }
             },
             "date-day": {
                 "type": "keyword",
                 "script": {
-                "source":"emit(doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString());" }
+                "source":"emit(doc['time'].value.getYear()+doc['time'].value.getMonth().toString()+doc['time'].value.getDayOfMonth().toString());" }
             }
         },
         aggs={
@@ -177,11 +177,11 @@ def es_query_traffic_per_hour(clientES):
         runtime_mappings={
             "hour": {
                 "type": "long",
-                "script": { "source": "emit(doc['mqtt_time'].value.getHour());" }
+                "script": { "source": "emit(doc['time'].value.getHour());" }
             },
             "date-day": {
                 "type": "keyword",
-                "script": { "source": "emit(doc['mqtt_time'].value.getYear()+doc['mqtt_time'].value.getMonth().toString()+doc['mqtt_time'].value.getDayOfMonth().toString());" }
+                "script": { "source": "emit(doc['time'].value.getYear()+doc['time'].value.getMonth().toString()+doc['time'].value.getDayOfMonth().toString());" }
             }
         },
         aggs={

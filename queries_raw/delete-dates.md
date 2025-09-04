@@ -10,7 +10,7 @@
 	      "filter": [
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2020-11-01",
 	                 "lte": "2022-11-02"            
 	
@@ -35,7 +35,7 @@
 	      "filter": [
 	        {
 	          "range":{
-	            "mqtt_time":{
+	            "time":{
 	                 "gte": "2022-05-01",
 	                 "lte": "2022-06-02"  
 	            }

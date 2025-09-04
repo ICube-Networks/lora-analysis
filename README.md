@@ -104,6 +104,7 @@ Be careful, we have in our dataset two versions for the mapping (v3 and v4). The
 	* rxInfo.uplinkID -> rxInfo.uplinkIdText
 		* ```Be careful:  uplinkID (v4) is a long, uplinkIDText (v3) is text!```
 	* codeRate -> change ```4/5``` (v3) into ```C_4_5``` (v4) to be consistent
+    * rxInfo.LoRaSNR -> rxInfo.snr
 
 
 
