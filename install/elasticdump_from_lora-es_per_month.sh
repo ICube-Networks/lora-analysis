@@ -35,10 +35,10 @@ INDEX=lora_gateway_rx_v4
 
 
 # years & months to process
-YEARS="2023"
-#YEARS="2020 2021 2022 2023"
-MONTHS="09 10 11 12"
-#MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
+YEARS="2024 2025"
+#YEARS="2020 2021 2022 2023 2024 2025"
+#MONTHS="07"
+MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
 
 #remove previous container in case of failure
 docker container inspect elasticdump && docker rm elasticdump
@@ -75,6 +75,6 @@ do
 
         # I keep only the compressed version
         tar -czvf `echo $INDEX`_data_`echo $date`.json.tar.gz `echo $INDEX`_data_`echo $date`.json
-        
+        rm `echo $INDEX`_data_`echo $date`.json
     done
 done
