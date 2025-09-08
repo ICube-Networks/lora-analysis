@@ -26,6 +26,8 @@ import flask
 # numerical libraries
 import pandas as pd
 from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
+from math import *
+
 
 # elastic search for the queries
 from elasticsearch import Elasticsearch
@@ -225,6 +227,7 @@ def elasticsearch_query_count_docs_with_twofields(fieldnames):
 #           TIME
 ############################################################
 
+
 class time:
 
     DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date in the elastic search dataset (mqtt time)
@@ -245,6 +248,11 @@ class time:
         # usual case: 2020-10-05T19:08:35.251262Z
         if len(parts) == 2:
             last_parts = parts[-1].split('Z')
+            
+            #specifc case: more than 6 digits (nanosec) -> divides by 10 until I have 6 digits only
+            while (int(last_parts[0]) > 999999 ):
+                last_parts[0] = format(floor(int(last_parts[0]) / 10))
+            
  
         #no microsecond: 2021-02-01T02:11:40Z
         else:
