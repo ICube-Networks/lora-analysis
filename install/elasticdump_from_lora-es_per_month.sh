@@ -37,10 +37,8 @@ INDEX=lora_gateway_rx_v4
 
 
 # years & months to process
-YEARS="2024 "
-#YEARS="2020 2021 2022 2023 2024 2025"
-MONTHS="06 07 08 09 10 11 12"
-#MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
+YEARS="2020 2021 2022 2023 2024 2025"
+MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
 
 #remove previous container in case of failure
 docker container inspect elasticdump && docker rm elasticdump
