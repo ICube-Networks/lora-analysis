@@ -50,7 +50,7 @@ logger_dup.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
-logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
+#logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 
 #profiling
@@ -93,7 +93,7 @@ def create_updated_entries(response):
     found = False   # used only for index=1, else, it is handled in the tests
     previous_id = 0
     for index in range(len(response)):
-        logger_dup.info("_id=" + response[index]['_id'])
+        logger_dup.debug("_id=" + response[index]['_id'])
         
         if index >= 1:
             # Same info (NB: the records are sorted by <phyPayload, time>
@@ -326,7 +326,7 @@ if __name__ == "__main__":
                 #logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " doc_count=" + str(phyPayload_info['doc_count']) + " (total=" + str(count_pkts) + "), mintime=" + time_min)
 
                 # earliest time
-                logger_dup.info("\t> " + phyPayload_info['time'] + " <? " + time_min + " payload="+ phyPayload_info['phyPayload']  + " nb_docs="+ str(phyPayload_info['doc_count']))
+                logger_dup.debug("\t> " + phyPayload_info['time'] + " <? " + time_min + " payload="+ phyPayload_info['phyPayload']  + " nb_docs="+ str(phyPayload_info['doc_count']))
                 if time_min == "" or datetime.strptime(tools.time.fixMicroseconds(time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) >  datetime.strptime(tools.time.fixMicroseconds(phyPayload_info['time']), tools.time.DATE_FORMAT_ELASTICSEARCH):
                     time_min = phyPayload_info['time']
                 
@@ -344,13 +344,13 @@ if __name__ == "__main__":
                 payload_max = phyPayload_info['phyPayload']
            
                 #info
-                logger_dup.info("\t> phyPayload_min=" + payload_min + " max=" + payload_max + " doc_count=" + str(count_pkts)+ ", batch mode")
+                logger_dup.debug("\t> phyPayload_min=" + payload_min + " max=" + payload_max + " doc_count=" + str(count_pkts)+ ", batch mode")
             # no bacth full (process individually each payload, not in batch mode)
             else:
                 time_min = phyPayload_info['time']
             
                 #info
-                logger_dup.info("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " nb_docs=" + str(phyPayload_info['doc_count'])+ ", nobatch mode")
+                logger_dup.debug("\t> phyPayload_min=" + phyPayload_info['phyPayload'] + " nb_docs=" + str(phyPayload_info['doc_count'])+ ", nobatch mode")
             
            
             # now processs the batch
@@ -359,7 +359,7 @@ if __name__ == "__main__":
                     response = get_packets_with_payloads_mqtt_min(payload_min, payload_max, time_min)
                 else:
                     response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], time_min)
-                logger_dup.info("\t> response: " +  str(len(response['hits']['hits'])) + " records")
+                logger_dup.debug("\t> response: " +  str(len(response['hits']['hits'])) + " records")
 
                 
                 # add the is_duplicate field to each entry of this response
@@ -370,18 +370,18 @@ if __name__ == "__main__":
                     if BATCH_FULL:
                           logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload_min="+ payload_min + " phyPayload_max="+ payload_max + " mqtt_min=" + time_min + ")")
                     else:
-                        logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_info['phyPayload'] + " mqtt_min=" + phyPayload_info['time'] + ")")
+                        logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_debug['phyPayload'] + " mqtt_min=" + phyPayload_info['time'] + ")")
                     tools.elasticsearch_push_updates(bulk_update)
-                    logger_dup.info("\t\t... pushed ")
+                    logger_dup.debug("\t\t... pushed ")
                 else:
-                    logger_dup.info("\t\tNo update in this window (" + phyPayload_info['phyPayload'] + ")")
+                    logger_dup.debug("\t\tNo update in this window (" + phyPayload_info['phyPayload'] + ")")
                     
                 # garbage collector
                 del bulk_update[:]
 
                 #no remaining response -> return in the main loop
                 if (len(response['hits']['hits']) < tools.queries.QUERY_NB_RESULT):
-                    logger_dup.info("\t\tNo more packets to process for phyPayload_min="+phyPayload_info['phyPayload'])
+                    logger_dup.debug("\t\tNo more packets to process for phyPayload_min="+phyPayload_info['phyPayload'])
                     
                     if BATCH_FULL:
                         count_pkts = 0
@@ -392,7 +392,7 @@ if __name__ == "__main__":
                 # next min payload & mqtt time (depending on the case)
                 if BATCH_FULL:
                     payload_min = response['hits']['hits'][-1]['_source']['phyPayload']
-                    #logger_dup.info(payload_min + " =?= " + response['hits']['hits'][-1]['_source']['time'])
+                    logger_dup.debug(payload_min + " =?= " + response['hits']['hits'][-1]['_source']['time'])
                 else:
                     time_min = response['hits']['hits'][-1]['_source']['time']
                     
