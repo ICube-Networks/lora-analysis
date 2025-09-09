@@ -370,7 +370,7 @@ if __name__ == "__main__":
                     if BATCH_FULL:
                           logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload_min="+ payload_min + " phyPayload_max="+ payload_max + " mqtt_min=" + time_min + ")")
                     else:
-                        logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload_debug['phyPayload'] + " mqtt_min=" + phyPayload_info['time'] + ")")
+                        logger_dup.info("\t\tPush the update to the server ("+ str(len(bulk_update))+" records) (phyPayload="+ phyPayload.debug['phyPayload'] + " mqtt_min=" + phyPayload_info['time'] + ")")
                     tools.elasticsearch_push_updates(bulk_update)
                     logger_dup.debug("\t\t... pushed ")
                 else:
