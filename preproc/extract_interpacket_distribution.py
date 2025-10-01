@@ -317,9 +317,7 @@ def eq_query_get_interpkt(devAddr):
             return(None)
         
         #no remaining response
-        length = len(response["hits"])
-                  
-        if (length == 0):
+        if (len(response["hits"]) == 0):
             logger_preprocflow.error("No packet matches for devAddr " + devAddr)
             break
 
@@ -425,8 +423,9 @@ def eq_query_get_interpkt(devAddr):
                     exit(7)
       
         #stops if we have less than QUERY_SIZE elements, it was the last response
-        if (length < tools.queries.QUERY_NB_RESULT):
+        if (len(response["hits"]["hits"]) < tools.queries.QUERY_NB_RESULT):
             break
+
 
     #all flows must be saved (or more precisely, their distribution)
     for flow in flows_for_thisDevAddr:
