@@ -44,7 +44,7 @@ echo "Flush -> ${FLUSH} "
 
 
 # flush the previous index
-if [ "${FLUSH}" -eq 1 ]
+if [ "$FLUSH" -eq 1 ]
 then
     #insecure mode since this is a self-signed certificate in ES
 

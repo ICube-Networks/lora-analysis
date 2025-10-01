@@ -317,7 +317,7 @@ class queries:
                     {"match": {"dup_infos.is_duplicate": False}},
                     {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": "000173b7" }},
                     {"exists": {"field": "extra_infos"}},
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
               ]
             }
         }
@@ -377,7 +377,7 @@ class queries:
             "bool": {
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
               ],
               "must": [
                     { "term": { "extra_infos.phyPayload.mhdr.mType": "2"  } }

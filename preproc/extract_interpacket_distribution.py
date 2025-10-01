@@ -66,7 +66,7 @@ import time
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
 
-AGG_OFFSET = 100000                   # offset for the pagination in the aggregated query
+AGG_OFFSET = 10000000               # offset for the pagination in the aggregated query
 DATE_FORMAT_ELASTICSEARCH = "%Y-%m-%dT%H:%M:%S.%fZ"     # format of the date
 CTRL_C_PRESSED = False              # has ctrl-c been pressed?
 FILENAME_DF = myconfig.directory_data+'/dataset.parquet'# the name of the file to read/write the data frames
@@ -104,6 +104,14 @@ def es_query_get_devAddr():
             }
         }
     )
+    #or run the following command in the console of ES
+    #PUT _cluster/settings
+    #{
+    #   "persistent": {
+    #        "search.max_buckets": 10000000
+    #   }
+    #}
+
 
     #Until we have still devAddr to get
     pagination_count = 0
@@ -151,12 +159,11 @@ def es_query_get_devAddr():
         # for the next page
         pagination_count = pagination_count + 1
         #print(pagination_count)
-        
-        # no more record
+
+       # no more record
         if (len(response["aggregations"]["devAddr"]["buckets"]) == 0):
             logger_preprocflow.debug("Elastic search: last page for the aggregate query")
             break;
-        
         
         # dump the json response for debug (VERY verbose !!)
         #logger_preprocflow.debug("GET_LIST:" + json.dumps(response.body, sort_keys=True, indent=4))
@@ -377,7 +384,7 @@ def eq_query_get_interpkt(devAddr):
                         time_difference_ms / fCnt_difference,      # normalize the interpacket time by the number of frames I've missed (fnct_diff)
                         fCnt_difference,
                         fCnt_current,
-                        current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0],
+                        current_packet_data["fields"]["txInfo.modulation.lora.spreadingFactor"][0],
                         datetime.strptime(tools.time.fixMicroseconds(current_packet_data["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH),
                         current_packet_data["fields"]["phyPayload"][0],
                         current_packet_data["fields"]["_id"][0],
@@ -395,7 +402,7 @@ def eq_query_get_interpkt(devAddr):
                         'interpkt_time_ms' : [0],
                         'fCnt_diff' : [0],
                         'fCnt' : [fCnt_current],
-                        'SF' : [current_packet_data["fields"]["txInfo.loRaModulationInfo.spreadingFactor"][0]],
+                        'SF' : [current_packet_data["fields"]["txInfo.modulation.lora.spreadingFactor"][0]],
                         'time' : [datetime.strptime(tools.time.fixMicroseconds(response["hits"]["hits"][i]["fields"]["time"][0]), DATE_FORMAT_ELASTICSEARCH)],
                         'phyPayload' : [response["hits"]["hits"][i]["fields"]["phyPayload"][0]],
                         '_id' : [current_packet_data["fields"]["_id"][0]],        #new flow, so cannot be a duplicated packet
@@ -415,7 +422,6 @@ def eq_query_get_interpkt(devAddr):
                     logger_preprocflow.critical("An error occured when parsing an ES response -> "+ str(e))
                     logger_preprocflow.critical("response:")
                     logger_preprocflow.critical(response)
-                    logger_preprocflow.critical("id="+ response[index]['_id'])
                     exit(7)
       
         #stops if we have less than QUERY_SIZE elements, it was the last response
