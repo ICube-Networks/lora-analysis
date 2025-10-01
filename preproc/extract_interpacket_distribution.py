@@ -646,7 +646,7 @@ class Application:
             logger_preprocflow.info(str(len(devAddr_proc)) + " devAddr already processed and saved in local:")
            
             #for debuging
-            if (logger_preprocflow.getEffectiveLevel() <= logging.DEBUG):
+            if (logger_preprocflow.getEffectiveLevel() <= logging.INFO):
                 logger_preprocflow.debug("\tdevAddr\t\tNb flows\tNb pkts")
             
                 for devAddr in devAddr_proc:
@@ -658,13 +658,14 @@ class Application:
                     logger_preprocflow.debug("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
                     logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
             
-            #drop the devAddr already processed from the dataframe
-            index_drops = devAddr_pending_df['devAddr'].isin(devAddr_proc).index
-            logger_preprocflow.info("\t> " + str(len(index_drops)) + " to drop")
-            devAddr_pending_df.drop(index_drops, inplace = True)
-            logger_preprocflow.info("\t> ... dropped")
  
-      
+            #drop the devAddr already processed from the dataframe
+            #index_drops = devAddr_pending_df['devAddr'].isin(devAddr_proc).index
+            logger_preprocflow.info("\t> " + str(len(devAddr_proc)) + " to drop")
+            #devAddr_pending_df.drop(index_drops, inplace = True)
+            devAddr_pending_df = devAddr_pending_df[devAddr_pending_df['devAddr'].isin(devAddr_proc) == False]
+            logger_preprocflow.info("\t> ... dropped")
+            
 
         #get the inter packet times for a given devAddr
         logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(devAddr_pending_df)) +" )")
