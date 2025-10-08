@@ -646,7 +646,7 @@ class Application:
             logger_preprocflow.info(str(len(devAddr_proc)) + " devAddr already processed and saved in local:")
            
             #for debuging
-            if (logger_preprocflow.getEffectiveLevel() <= logging.INFO):
+            if (logger_preprocflow.getEffectiveLevel() <= logging.DEBUG):
                 logger_preprocflow.debug("\tdevAddr\t\tNb flows\tNb pkts")
             
                 for devAddr in devAddr_proc:
