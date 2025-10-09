@@ -82,7 +82,7 @@ then
 elif [ "$VERSION" -eq 4 ]
 then
 
-    curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 4; "}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
+    curl -k -X POST -H "Content-Type: application/json" -d '{"source":{"index":"'$INDEX_NAME_INPUT'"},"dest":{"index":"'$INDEX_NAME_OUTPUT'"},"script":{"source":"ctx._source['"'"'src_version'"'"'] = 4; ctx._source['"'"'txInfo.modulation.type'"'"'] = '"'"'LORA'"'"';  "}}' "https://${HOSTNAME}:9200/_reindex?wait_for_completion=false" -u ${USER}:${PASSWORD}
 
 #else -> not supported
 else
