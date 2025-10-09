@@ -212,7 +212,7 @@ def elasticsearch_query_count_docs_with_twofields(fieldnames):
     clientES.transport.close()
     
     if results_df.empty:
-        logger.critical("Empty pandaframe")
+        print("Empty pandaframe")
         exit(2)
     
     #result
@@ -301,8 +301,8 @@ class queries:
             "bool": {
               "filter" : [
                     {"match": {"dup_infos.is_duplicate": False}},
-                    { "exists": {"field": "extra_infos" }},
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"exists": {"field": "extra_infos" }},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
               ]
             }
         }
@@ -333,7 +333,7 @@ class queries:
                     {"exists": {"field": "extra_infos" } }
                 ],
                 "must": [
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
                 ]
             }
         }
@@ -350,7 +350,7 @@ class queries:
                     { "term": { "extra_infos.phyPayload.mhdr.mType": "2" }  }
                 ],
                 "must": [
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
                 ]
 
             }
@@ -364,7 +364,7 @@ class queries:
             "bool": {
               "must": [
                     { "term": {"extra_infos.phyPayload.mhdr.mType": "2"}    },
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
                 ]
             }
         }
@@ -393,7 +393,7 @@ class queries:
     QUERY_ALL = {
             "bool": {
                 "filter": [
-                    {"match": {"txInfo.modulation": "LORA"}},
+                    {"match": {"txInfo.modulation.type": "LORA"}},
                     {"match": {"rxInfo.crcStatus": "CRC_OK"}},
                     {
                         "range":{
