@@ -25,8 +25,14 @@ sys.path.insert(1, '../preproc')
 # configuration parameters
 import myconfig
 
+# multithreading to speed up
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+
 # my tool functions in common for the analysis
 import tools
+import time
 
 # numerical libraries
 import pandas as pd
@@ -64,7 +70,7 @@ import extract_interpacket_distribution
 NB_PKTS_MIN = 5         # minimum number of packets for a given devAddr (else discarded) to compute the median value
 FNCT_DIFF_MAX = 100     # maximum average fnct_diff for a flow
 NB_PLOTS = 16           # number of plots for individual distributions
-
+NB_THREADS = 5          # number of threads to parallelize
 
 
 # --------------------------------------------------------
@@ -139,7 +145,40 @@ def plot_nbdups_CDF(pd_flat_values):
 #       MAIN
 # --------------------------------------------------------
 
-   
+
+# to print the progress
+counter = 0
+counter_printed = 0
+lock = threading.Lock()
+nb_devAddrs = 0
+
+
+ # thread to read distributions
+def read_distribs_from_disk(pd_all_flows, devAddrList):
+    global counter
+    global counter_printed
+    pd_distrib = []
+    
+    #for all devAddrs in the list
+    for devAddr in devAddrList:
+        
+         pd_distrib.append(extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr)['nb_duplicates'])
+         
+         #to print the progress
+         with lock:
+            counter += 1
+            if (counter - counter_printed)/nb_devAddrs > 0.01 :
+                counter_printed = counter
+                print("\t " + str(round(100 * counter / nb_devAddrs, 1)) + "%     " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
+                
+            if counter / nb_devAddrs > 0.02 :
+                return(pd_distrib)
+                
+                
+         
+    return(pd_distrib)
+        
+        
     
 # executable
 if __name__ == "__main__":
@@ -179,21 +218,42 @@ if __name__ == "__main__":
 
 
     # --- Analysis ---
-
     
-    # flat values for all the flows (a single dataframe with all the packets)
+    # read the distributions from the disk
+    thread_list = []
+    devAddr_list = pd_all_flows['devAddr'].drop_duplicates()
+    nb_devAddrs = len(devAddr_list)
+    block_size = math.ceil(nb_devAddrs / NB_THREADS)
+    with ThreadPoolExecutor(max_workers=NB_THREADS) as executor:
+        
+        # starts each thread
+        for i in range(0, NB_THREADS) :
+            
+            # split the list into blocks of equal size
+            if (len(thread_list) < NB_THREADS - 1):
+                devAddr_sublist = devAddr_list.iloc[len(thread_list) * block_size : (len(thread_list) + 1) * block_size ]
+            else:
+                devAddr_sublist = devAddr_list.iloc[len(thread_list) * block_size : ]
+ 
+            #run the thread
+            thread_list.append(executor.submit(read_distribs_from_disk, pd_all_flows, devAddr_sublist))
+    
+    #threads have terminated -> get the results
     pd_distrib = []
-    for devAddr in pd_all_flows['devAddr']:
-        pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib)
+    for thread in thread_list:
+        pd_distrib.extend(thread.result())
+
+
+            
     #transform the array into a dataframe
     pd_flat_values = pd.concat(pd_distrib)
+    print(type(pd_flat_values))
+    print((pd_flat_values > 0).any())
 
     # time distribution of the packet losses
     #plot_nbdups_time_heatmap(pd_flat_values)
         
     # CDF nb_duplicates
-    plot_nbdups_CDF(pd_flat_values['nb_duplicates'])
+    plot_nbdups_CDF(pd_flat_values)
     
-    
-    # addresses
-
+ 
