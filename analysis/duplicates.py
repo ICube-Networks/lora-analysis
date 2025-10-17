@@ -171,10 +171,6 @@ def read_distribs_from_disk(pd_all_flows, devAddrList):
                 counter_printed = counter
                 print("\t " + str(round(100 * counter / nb_devAddrs, 1)) + "%     " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
                 
-            if counter / nb_devAddrs > 0.02 :
-                return(pd_distrib)
-                
-                
          
     return(pd_distrib)
         
@@ -242,14 +238,10 @@ if __name__ == "__main__":
     pd_distrib = []
     for thread in thread_list:
         pd_distrib.extend(thread.result())
-
-
-            
+        
     #transform the array into a dataframe
     pd_flat_values = pd.concat(pd_distrib)
-    print(type(pd_flat_values))
-    print((pd_flat_values > 0).any())
-
+    
     # time distribution of the packet losses
     #plot_nbdups_time_heatmap(pd_flat_values)
         

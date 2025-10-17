@@ -366,7 +366,7 @@ class queries:
                     {
                         "range":{
                             "time":{
-                                 "gte": "2025-08-01", #DATE_START_DATASET,
+                                 "gte": DATE_START_DATASET,
                                  #"lte": "2020-12-30",
                                  "format": "year_month_day",
                             }
@@ -387,16 +387,7 @@ class queries:
               "filter" : [
                     {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
                     {"match": {"txInfo.modulation.type": "LORA"}},
-                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": devAddr }},
-                    {
-                        "range":{
-                            "time":{
-                                 "gte": "2025-08-01", #DATE_START_DATASET,
-                                 #"lte": "2020-12-30",
-                                 "format": "year_month_day",
-                            }
-                        }
-                    }
+                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": devAddr }}
               ]
             }
         }
