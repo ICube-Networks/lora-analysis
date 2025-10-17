@@ -199,8 +199,18 @@ GET /lora-index/_search?pretty=true
 	}
 	
 ```
-	
 
+* count the nb of packets without an extra_infos field
+```
+GET /lora-v4/_count?pretty=true
+	{
+	"query": {
+    "exists": {
+      "field": "extra_infos"
+    }
+	}
+}
+```
 	
 
 # complex query

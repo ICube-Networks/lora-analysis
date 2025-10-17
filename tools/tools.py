@@ -304,6 +304,14 @@ class queries:
                     {"exists": {"field": "extra_infos" }},
                     {"match": {"txInfo.modulation.type": "LORA"}},
               ]
+              #,
+              #"must" : [{
+              #  "range": {
+              #      "time": {
+              #            "gte": "2025-06-10T09:40:19.485088Z",
+              #      }
+              #  }
+            #}]
             }
         }
         

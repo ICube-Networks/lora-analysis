@@ -65,6 +65,7 @@ def es_query_count_for_field(params):
 
     clientES = tools.elasticsearch_open_connection()
 
+        
     #get the number of valid records per day of the week
     resp = clientES.options(
         basic_auth=(myconfig.user, myconfig.password)
@@ -78,20 +79,19 @@ def es_query_count_for_field(params):
             params['fieldname1']: {
                 "terms": {
                     "field": params['fieldname1'],
-                    "size": 1000,
+                    "size": params['fieldname1_size'],
                 },
                 "aggs": {
                     params['fieldname2']: {
                         "terms": {
                             "field": params['fieldname2'],
-                            "size": 1000,
+                            "size": params['fieldname2_size'],
                         }
                     }
                 }
             }
         }
     )
-    #print(resp)
     
     # transform the aggregation results into a pandas' dataframe
     results_df = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(params['fieldname1'],params['fieldname2']), key_as_string=False)
@@ -128,14 +128,18 @@ def plot_pkt_per_devaddr():
     #parameters of the query for devAddr
     params_list.append({
         'fieldname1' : 'extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword',
-        'fieldname2' : 'rxInfo.gatewayID.keyword',
+        'fieldname1_size' : 10000000,
+        'fieldname2' : 'rxInfo.gatewayId.keyword',
+        'fieldname2_size' : 20,
         'xlabel' : 'Number of packets per devAddr',
         'figname' : 'figures/devaddr_distrib_pkts_per_devAddr.pdf'
         })
     #parameters of the query for devEUI
     params_list.append({
         'fieldname1' : 'extra_infos.phyPayload.macPayload.devEUI.keyword',
-        'fieldname2' : 'rxInfo.gatewayID.keyword',
+        'fieldname1_size' : 10000000,
+        'fieldname2' : 'rxInfo.gatewayId.keyword',
+        'fieldname2_size' : 20,
         'xlabel' : 'Number of packets per devEUI',
         'figname' : 'figures/devaddr_distrib_pkts_per_devEUI.pdf'
         })
@@ -168,109 +172,6 @@ def plot_pkt_per_devaddr():
         g.figure.clf()
 
 
-
-def es_query_devaddr_duration(operator, field_scope, field_value):
-    """Elastic search query for a double aggregate query.
-    
-    This function sends a query to an elastic search server to retrieve the doc counts
-    for two field values (fieldname1 and fieldname2), and returns the corresponding
-    pandas DataFrame
-    
-    :param string operator: the aggregation operator (max or min) for the query which will be used on the field "field_value".
-    
-    :param dictionary field_scope: name of the elastic field to define classes (e.g., extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword to group the packets per devAddr)
-    
-    :param dictionary field_value: name of the field where the operator is applied (e.g. time to get the max or min time for a given class)
-    
-    :returns: a pandas DataFrame which contains the duration of all
-    :rtype: DataFrame
-    """
-
-    
-    # open the connection to the elastic search server
-    clientES = tools.elasticsearch_open_connection()
-
-    #PIT creation
-  #  pit_id = tools.elasticsearch_create_pit(clientES)
-  #  logger_devaddr.debug("PIT id: " + str(pit_id))
-
-    min_next = ""
-    while True:
-        
-        logger_devaddr.info("Min key for the next ES query: " + min_next)
-
-        #get the number of valid records per day of the week
-        try:
-            resp = clientES.options(
-                basic_auth=(myconfig.user, myconfig.password)
-            ).search(
-                index=myconfig.index_name,
-                size=0,
-                pretty=True,
-                human=True,
-                query=tools.queries.QUERY_DATA_NODUP,
-                aggs={
-                    field_scope: {
-                        "composite": {
-                        "size" : tools.queries.QUERY_NB_RESULT,
-                        "sources": [{
-                            field_scope: {
-                                "terms": {"field": field_scope}
-                            }
-                        }],
-                        "after": { field_scope: min_next }
-                      },
-                      "aggs":{
-                        operator+field_value: {operator: {"field": field_value}},
-                        "max"+field_value: {"max": {"field": field_value}}
-                      }
-                    }
-                  },
-                  sort=[
-                    {field_scope : "asc"},
-                  ],
-                  search_after=[
-                    min_next
-                  ],
-            )
-
-        # handle the exception
-        except Exception as error:
-            print("An exception occurred:", error) # An exception occurred: division by zero
-            exit(5)
-               
-        #next minimum value
-        min_next = resp['aggregations'][field_scope]['after_key'][field_scope]
-                  
-        # transform the aggregation results into a pandas' dataframe
-        results_df_tmp = tools.elasticsearch_agg_into_dataframe(es_reply=resp, agg_names=(field_scope, ), field_values=(operator+field_value, "max"+field_value), key_as_string=False)
- 
- 
-        # append the new dataframe to the previous one (or copy if it doesn't yet exist)
-        if 'results_df' in locals():
-            results_df = pd.concat([results_df, results_df_tmp], ignore_index=True)
-        else:
-            results_df = results_df_tmp
-
-
-        #print(resp['aggregations'][field_scope])
-        logger_devaddr.info("Num records read: " + str(len(resp['aggregations'][field_scope]['buckets'])))
-
-        if (len(resp['aggregations'][field_scope]['buckets']) < tools.queries.QUERY_NB_RESULT):
-            break
-                
-    clientES.transport.close()
-
-    
-    
-    if results_df.empty:
-        logger_devaddr.critical("Empty pandaframe")
-        exit(2)
-    
-    #result
-    return(results_df)
- 
-    
 
 
 
