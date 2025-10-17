@@ -283,7 +283,9 @@ class queries:
     # parameters
     QUERY_NB_RESULT = 10000             # max number of results for one query
     CLUSTER_BUCKET_SIZE = 20000000      # max size of the bucket for agg queries (NB: all the existing devAddr possibly)
-  
+    DATE_START_DATASET = "2020-09-01"   # the date of the first correct packet in the dataset
+    
+    
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST =  {
             "bool": {
@@ -315,24 +317,12 @@ class queries:
             }
         }
         
+
+        
+        
     """
     Query to match all the documents that have an extra_infos field.
     """
-    # fields extra_info exist for the frame
-    QUERY_DATA_NODUP_FOR_DEVADDR =  {
-            "bool": {
-              "filter" : [
-                    {"match": {"dup_infos.is_duplicate": False}},
-                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": "000173b7" }},
-                    {"exists": {"field": "extra_infos"}},
-                    {"match": {"txInfo.modulation.type": "LORA"}},
-              ]
-            }
-        }
-    """
-    Query to match all the documents that have an extra_infos field.
-    """
-    
 
     # fields extra_info exist for the frame
     QUERY_NOEXTRAINFO_EXIST =  {
@@ -351,7 +341,7 @@ class queries:
     Query to match all the documents that have NO extra_infos field.
     """
     
-    # the data frames only
+    # no data frames
     QUERY_NODATA =  {
             "bool": {
               "must_not": [
@@ -373,30 +363,48 @@ class queries:
               "must": [
                     { "term": {"extra_infos.phyPayload.mhdr.mType": "2"}    },
                     {"match": {"txInfo.modulation.type": "LORA"}},
+                    {
+                        "range":{
+                            "time":{
+                                 "gte": "2025-08-01", #DATE_START_DATASET,
+                                 #"lte": "2020-12-30",
+                                 "format": "year_month_day",
+                            }
+                        }
+                    }
                 ]
             }
         }
     
     """
-    Query to match all the documents that are data packets (extra_infos mtype=2).
+    Query to match all the data packets for a specific devADDr
     """
-    # the data frames only
-    QUERY_DATA_NODUP =  {
+    
+    def QUERY_DATA_FOR_DEVADDR (devAddr) :
+        return(
+        {
             "bool": {
               "filter" : [
-                    {"match": {"dup_infos.is_duplicate": False}},
+                    {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
                     {"match": {"txInfo.modulation.type": "LORA"}},
-              ],
-              "must": [
-                    { "term": { "extra_infos.phyPayload.mhdr.mType": "2"  } }
-                ]
+                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": devAddr }},
+                    {
+                        "range":{
+                            "time":{
+                                 "gte": "2025-08-01", #DATE_START_DATASET,
+                                 #"lte": "2020-12-30",
+                                 "format": "year_month_day",
+                            }
+                        }
+                    }
+              ]
             }
         }
+        )
     
     """
     Query to match all the documents that are data packets (extra_infos mtype=2), removing duplicates.
     """
-
 
     QUERY_ALL = {
             "bool": {
@@ -406,7 +414,7 @@ class queries:
                     {
                         "range":{
                             "time":{
-                                 "gte": "2020-09-01",
+                                 "gte": DATE_START_DATASET,
                                  #"lte": "2020-12-30",
                                  "format": "year_month_day",
                             }
@@ -415,8 +423,10 @@ class queries:
                 ]
             }
         }
+        
+        
     """
-    Query to match any document corresponding to a correctly received LoRa frame.
+    Query to match any document corresponding to a correctly received LoRa frame, removing duplicated packets.
     """
     
     QUERY_ALL_NODUP = {
@@ -428,7 +438,7 @@ class queries:
                     {
                         "range":{
                             "time":{
-                                 "gte": "2020-09-01",
+                                 "gte": DATE_START_DATASET,
                                  "format": "year_month_day",
                             }
                         }

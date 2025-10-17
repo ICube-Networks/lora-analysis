@@ -116,6 +116,7 @@ def es_query_get_devAddr():
     #Until we have still devAddr to get
     pagination_count = 0
     list_devAddr = []
+    
     while True:
 
         try:
@@ -125,7 +126,7 @@ def es_query_get_devAddr():
                 request_timeout=3000,
                 pretty=True,
                 human=True,
-                query=tools.queries.QUERY_DATA_NODUP,
+                query=tools.queries.QUERY_DATA,
                 aggs={
                     "devAddr": {
                         "terms": {
@@ -238,23 +239,11 @@ def es_query_get_devAddr_tx(devAddr, time_min):
         clientES = tools.elasticsearch_open_connection()
  
         response = clientES.search(
-            index=myconfig.index_name,
-            size=tools.queries.QUERY_NB_RESULT,
-            pretty=True,
-            human=True,
-            query={
-                "bool": {
-                    "filter" : [
-                        
-                        {"term": {"dup_infos.is_duplicate": False}},
-                        {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
-                        {"term": {"extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword": devAddr}},
-                    ],
-                    "must": [
-                        { "exists": { "field": "dup_infos"  }  }
-                    ]
-                }
-            },
+            index = myconfig.index_name,
+            size = tools.queries.QUERY_NB_RESULT,
+            pretty = True,
+            human = True,
+            query = tools.queries.QUERY_DATA_FOR_DEVADDR(devAddr),
             fields=[
                 "time",
                 "extra_infos.phyPayload.macPayload.fhdr.fCnt",
@@ -266,8 +255,9 @@ def es_query_get_devAddr_tx(devAddr, time_min):
             ],
             sort=[
                 "time",
+                "dup_infos.is_duplicate"        # be careful, duplicates (1) must be ranked after the original packet
             ],
-            search_after=[time_min],
+            search_after=[time_min, False],
             source = False
         )
     
@@ -325,10 +315,11 @@ def eq_query_get_interpkt(devAddr):
         for i in range(0, len(response["hits"]["hits"])):
             found = False
             current_packet_data = response["hits"]["hits"][i]
-         
+           
             # If duplicate, search the flow of the original packet
             # the original packet has already been processed since duplicates are packets received *later*
             if current_packet_data["fields"]["dup_infos.is_duplicate"][0] is True:
+
                 for flow in flows_for_thisDevAddr:
                 
                     # search for the row with this _id in the corresponding flow
@@ -336,16 +327,30 @@ def eq_query_get_interpkt(devAddr):
                     
                     # one row has been found, increment the corresponding nb of duplicates
                     if row_index.size > 0 :
-                        #if current_packet_data["fields"]["dup_infos.copy_of"][0] not in flow['pd_distrib']['_id'].values :
-                        #    logger_preprocflow.error("No packet match while we have a row index!")
+                        if current_packet_data["fields"]["dup_infos.copy_of"][0] not in flow['pd_distrib']['_id'].values :
+                            logger_preprocflow.error("No packet match while we have a row index!")
                         
                         flow['pd_distrib'].loc[row_index, 'nb_duplicates'] += 1
                         found = True
                         break
                         
-                # bug
+                    
+               
+                        
+                # bug  2025-08-02T07:58:18.677127Z, 2025-08-02T07:58:18.677127Z
                 if found is False:
-                    logger_preprocflow.error("No packet matches this duplicate " + current_packet_data["fields"]["_id"] + " copy of " + current_packet_data["fields"]["dup_infos.copy_of"])
+                    print("-----")
+                    print("id: "+ current_packet_data["fields"]["_id"][0])
+                    print("copyn of : " + current_packet_data["fields"]["dup_infos.copy_of"][0])
+                    print("------")
+                    print(flows_for_thisDevAddr)
+                    exit(2)
+
+                
+                
+                
+                
+                    logger_preprocflow.error("No packet matches this duplicate " + current_packet_data["fields"]["_id"][0] + " copy of " + current_packet_data["fields"]["dup_infos.copy_of"][0])
                 # next packet, this duplicated packet is processed
                 continue
                 
@@ -513,14 +518,12 @@ def save_to_disk(pd_all_flows):
  
 
 
-def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib, verbose=False):
+def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False):
     """ load a list of individual distribution from the disk into a dataframe (with parquet)
         
     :param pd_all_flows: a pandas distribution representing all the flows (synthetic data) in the dataset
 
     :param devAddr: the devAddr to read from the filesystem
-    
-    :param pd_distrib: a list to complete with the additionnal 
     
     :param verbose: verbose mode (default=False) to debug
      
@@ -530,17 +533,17 @@ def load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_distrib, verbos
     
     """
      
-    #get all the time for theis devAddr
-    for time_1st in pd_all_flows[pd_all_flows['devAddr']== devAddr]['time_1st']:
+    #get all the time for this devAddr
+    for time_1st in pd_all_flows[pd_all_flows['devAddr'] == devAddr]['time_1st']:
     
         filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
-        pd_distrib.append(pd.read_parquet(filename_distrib))
+        pd_read = pd.read_parquet(filename_distrib)
         
         if verbose:
-           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time_ms'].size) + " filename=" + filename)
+           logger_preprocflow.info("Addr=" + devAddr + " Distrib_length=" + str(pd_read['interpkt_time_ms'].size) + " filename=" + filename)
  
     
-    return(pd_distrib)
+    return(pd_read)
     
     
 def load_distribs_forDevAddr_and_time_1st_from_disk(devAddr, time_1st, verbose=False):
@@ -615,20 +618,20 @@ class Application:
         """ Ctrl-c has been pressed
         
         """
+
         self.terminated = True
         
        
 
         
         
-        
-  
+   
     def MainLoop( self ):
         """ Ask for all the packets for each devAddr to store info in a pandas dataframe
                     
         """
             
-        
+  
         #get the list of devaddrs in the elastic search DB
         devAddr_pending_df = es_query_get_devAddr()
         #print(devAddr_pending_df)
@@ -653,7 +656,7 @@ class Application:
                     #remove the corresponding row
                     #devAddr_pending_df = devAddr_pending_df[devAddr_pending_df['devAddr'].ne(devAddr)]
                 
-                    pd_records = load_distribs_forDevAddr_from_disk(self.pd_all_flows, devAddr, [], verbose=False)
+                    pd_records = load_distribs_forDevAddr_from_disk(self.pd_all_flows, devAddr, verbose=False)
                       
                     logger_preprocflow.debug("\t" + devAddr + "\t" + str(len(pd_records)) + "\t\t" + str(self.pd_all_flows[self.pd_all_flows.devAddr == devAddr]["nb_pkts"].sum()) )
                     logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
@@ -721,7 +724,7 @@ if __name__ == "__main__":
     # ---- debug for one specific address -----
     #devAddr = "0e7290de"
     #print(pd_all_flows[pd_all_flows['devAddr'] == devAddr])
-    #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, pd_records=[], verbose=False)       # complete distrib already processed
+    #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)       # complete distrib already processed
     #pd_records = eq_query_get_interpkt(devAddr)      # distrib reextracted (not processed)
     #print(pd_records)
     #exit(0)
