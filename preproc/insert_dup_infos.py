@@ -62,7 +62,13 @@ OFFSET_MINUTES_MAX = 60    # max offset to search for duplicates (length of the 
 
 # BATCH_FULL = query with a min and max payload
 # BATCH_FULL False = batch to get the list of payloads, but then process individually each payload
-BATCH_FULL=False
+BATCH_FULL = True
+
+
+
+
+
+
 
 
 ############################################################
@@ -131,7 +137,7 @@ def create_updated_entries(response):
         previous_id = dup_infos['copy_of']
         
         
-        #construct the nex update for this id
+        #construct the next update for this id
         req_update = {}
         req_update = response[index]['_source']
         req_update['_index']       = myconfig.index_name
@@ -161,7 +167,18 @@ def get_nodupinfo_phyPayload_list():
         query={
             "bool": {
                 "must_not" : [
-                    {"term": {"dup_infos.version": DUP_INFO_VERSION}}
+                    {"match": {"dup_infos.version": DUP_INFO_VERSION}},
+                ],
+                "filter" :[
+                    {
+                        "range":{
+                            "time":{
+                                 "gte": "2025-08-01",
+                                 #"lte": "2020-12-30",
+                                 "format": "year_month_day",
+                            }
+                        }
+                    }
                 ]
             }
         },
@@ -308,6 +325,8 @@ if __name__ == "__main__":
         count_pkts = 0
         payload_min = ""
         time_min = ""
+        
+        
     while True:
         
         # retrieve 10K non handled phyPayloads (with their mqtt time and their doc_count)
@@ -329,7 +348,6 @@ if __name__ == "__main__":
                 logger_dup.debug("\t> " + phyPayload_info['time'] + " <? " + time_min + " payload="+ phyPayload_info['phyPayload']  + " nb_docs="+ str(phyPayload_info['doc_count']))
                 if time_min == "" or datetime.strptime(tools.time.fixMicroseconds(time_min), tools.time.DATE_FORMAT_ELASTICSEARCH) >  datetime.strptime(tools.time.fixMicroseconds(phyPayload_info['time']), tools.time.DATE_FORMAT_ELASTICSEARCH):
                     time_min = phyPayload_info['time']
-                
                 
                 #min payload
                 if payload_min == "" :
@@ -360,8 +378,7 @@ if __name__ == "__main__":
                 else:
                     response = get_packets_with_payload_mqtt_min(phyPayload_info['phyPayload'], time_min)
                 logger_dup.debug("\t> response: " +  str(len(response['hits']['hits'])) + " records")
-
-                
+              
                 # add the is_duplicate field to each entry of this response
                 bulk_update = create_updated_entries(response['hits']['hits'])
 
@@ -375,7 +392,7 @@ if __name__ == "__main__":
                     logger_dup.debug("\t\t... pushed ")
                 else:
                     logger_dup.debug("\t\tNo update in this window (" + phyPayload_info['phyPayload'] + ")")
-                    
+                
                 # garbage collector
                 del bulk_update[:]
 
