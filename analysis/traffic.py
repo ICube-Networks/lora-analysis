@@ -327,8 +327,6 @@ def plot_traffic_evolution(results_df):
     # save the figure
     fig = g.figure.savefig("figures/traffic_evolution.pdf")
 
- 
-
 
 
 # executable
@@ -340,6 +338,8 @@ if __name__ == "__main__":
     #elastic search query, transformed in a panda dataFrame
     results_df = es_query_traffic_evolution()
     print(results_df)
+    #results_df_sort = results_df.sort_values(by='date', ascending=True)
+    #results_df_sort.to_csv("traffic.csv", index=True)
     plot_traffic_evolution(results_df)
     
     

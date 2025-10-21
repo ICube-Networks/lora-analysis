@@ -112,10 +112,10 @@ def  es_query_packets_list_random():
         #rename the fields
         df_tempo = df_tempo.rename(columns={
             "fields.rxInfo.rssi": "rssi",
-            "fields.rxInfo.loRaSNR": "loRaSNR",
+            "fields.rxInfo.snr": "loRaSNR",
             "fields.rxInfo.crcStatus": "crcStatus",
             "fields.rxInfo.channel": "channel",
-            "fields.txInfo.loRaModulationInfo.spreadingFactor": "spreadingFactor",
+            "fields.txInfo.modulation.lora.spreadingFactor": "spreadingFactor",
         }, errors="raise")
 
         # flatten the values (by default, each value is an array with one element
