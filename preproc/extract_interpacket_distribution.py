@@ -52,7 +52,7 @@ from datetime import datetime, timedelta
 #logs
 import logging
 logger_preprocflow = logging.getLogger('interpkt_distribution')
-logger_preprocflow.setLevel(logging.INFO)
+logger_preprocflow.setLevel(logging.DEBUG)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
@@ -235,6 +235,10 @@ def es_query_get_devAddr_tx(devAddr, time_min):
     :rtype: elastic search json response + string
     """
 
+
+    logger_preprocflow.debug("New Elastic Search query for devAddr " + devAddr + " after [" + str(time_min) + ", " + str(False) + "]")
+               
+
     try:
         clientES = tools.elasticsearch_open_connection()
  
@@ -305,7 +309,7 @@ def eq_query_get_interpkt(devAddr):
         logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
         if response is None:
             return(None)
-        
+            
         #no remaining response
         if (len(response["hits"]) == 0):
             logger_preprocflow.error("No packet matches for devAddr " + devAddr)
@@ -345,9 +349,6 @@ def eq_query_get_interpkt(devAddr):
                     print("------")
                     print(flows_for_thisDevAddr)
                     exit(2)
-
-                
-                
                 
                 
                     logger_preprocflow.error("No packet matches this duplicate " + current_packet_data["fields"]["_id"][0] + " copy of " + current_packet_data["fields"]["dup_infos.copy_of"][0])
@@ -561,7 +562,8 @@ def load_distribs_forDevAddr_and_time_1st_from_disk(devAddr, time_1st, verbose=F
      
     filename_distrib = FILENAME_DISTRIB + devAddr + '_' + time_1st.strftime(tools.time.DATE_FORMAT_FILENAME) + '.parquet'
     pd_distrib = pd.read_parquet(filename_distrib)
-    logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time_ms'].size) + " filename=" + filename_distrib)
+    if verbose:
+        logger_preprocflow.debug("Addr=" + devAddr + " Distrib_length=" + str(pd_distrib['interpkt_time_ms'].size) + " filename=" + filename_distrib)
     
      
     return(pd_distrib)
@@ -618,6 +620,7 @@ class Application:
         """ Ctrl-c has been pressed
         
         """
+
 
         self.terminated = True
         
@@ -678,7 +681,7 @@ class Application:
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
-            #print(pd_records.to_string())
+            print(pd_records.to_string())
             
             # concatenation to the global pandaframe
             if pd_records is not None :
