@@ -371,7 +371,8 @@ class queries:
                                  "format": "year_month_day",
                             }
                         }
-                    }
+                    },
+                    {"exists": {"field": "dup_infos.is_duplicate" } },
                 ]
             }
         }
@@ -387,8 +388,11 @@ class queries:
               "filter" : [
                     {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
                     {"match": {"txInfo.modulation.type": "LORA"}},
-                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": devAddr }}
-              ]
+                    {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": devAddr }},
+              ],
+              "must": [
+                    {"exists": {"field": "dup_infos.is_duplicate" } },
+              ],
             }
         }
         )

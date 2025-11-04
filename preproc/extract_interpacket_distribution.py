@@ -52,7 +52,7 @@ from datetime import datetime, timedelta
 #logs
 import logging
 logger_preprocflow = logging.getLogger('interpkt_distribution')
-logger_preprocflow.setLevel(logging.DEBUG)
+logger_preprocflow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
@@ -236,7 +236,7 @@ def es_query_get_devAddr_tx(devAddr, time_min):
     """
 
 
-    logger_preprocflow.debug("New Elastic Search query for devAddr " + devAddr + " after [" + str(time_min) + ", " + str(False) + "]")
+    logger_preprocflow.info("New Elastic Search query for devAddr " + devAddr + " after [" + str(time_min) + ", " + str(False) + "]")
                
 
     try:
@@ -681,7 +681,7 @@ class Application:
 
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
-            print(pd_records.to_string())
+            #print(pd_records.to_string())
             
             # concatenation to the global pandaframe
             if pd_records is not None :
