@@ -679,6 +679,12 @@ class Application:
     
         for devAddr in devAddr_pending_df['devAddr'] :
 
+            # stop test
+            if devAddr == '021b94c2':
+                print("------- Application manually interrupted (specific addr) ----- ")
+                break
+            
+
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
             #print(pd_records.to_string())
