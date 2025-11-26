@@ -284,7 +284,10 @@ class queries:
     QUERY_NB_RESULT = 10000             # max number of results for one query
     CLUSTER_BUCKET_SIZE = 20000000      # max size of the bucket for agg queries (NB: all the existing devAddr possibly)
     DATE_START_DATASET = "2020-09-01"   # the date of the first correct packet in the dataset
-    
+
+    #parameters
+    EXTRA_INFO_VERSION = "1.0"
+
     
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST =  {
@@ -327,8 +330,8 @@ class queries:
     # fields extra_info exist for the frame
     QUERY_NOEXTRAINFO_EXIST =  {
             "bool": {
-              "must_not": [
-                    {"exists": {"field": "extra_infos" } }
+                "must_not": [
+                    {"term" :{ "extra_infos.version": EXTRA_INFO_VERSION }},
                 ],
                 "must": [
                     {"match": {"txInfo.modulation.type": "LORA"}},
@@ -387,7 +390,7 @@ class queries:
             "bool": {
               "filter" : [
                     {"term": {"extra_infos.phyPayload.mhdr.mType": "2"}},
-                    {"match": {"txInfo.modulation.type": "LORA"}},
+                    #{"match": {"txInfo.modulation.type": "LORA"}},
                     {"match":  {"extra_infos.phyPayload.macPayload.fhdr.devAddr": devAddr }},
               ],
               "must": [

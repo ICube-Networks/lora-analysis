@@ -54,9 +54,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 
 
-#parameters
-EXTRA_INFO_VERSION = "1.0"
-
 
 
 
@@ -96,27 +93,14 @@ if __name__ == "__main__":
         ).search(
             index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
-            query={
-                "bool": {
-                    "must_not": {
-                        "term" :{
-                            "extra_infos.version": EXTRA_INFO_VERSION
-                        }
-                    }
-                }
-            }#,
-            #sort them chronologically (just because it's convenient for debuging)
-            #sort=[
-            #        {"time": {"order": "asc"}},
-            #        {"_score": {"order": "desc"}},
-            #]
+            query=QUERY_NOEXTRAINFO_EXIST,
         )
 
         # num of records
         length = len(response['hits']['hits'])
         #print("length:", length)
         if (length == 0):
-            LOGGER.info("No remaining entry without the right extra_infos field (version=" + EXTRA_INFO_VERSION + ")")
+            LOGGER.info("No remaining entry without the right extra_infos field (version=" + queries.EXTRA_INFO_VERSION + ")")
             break
         
         #extracts the mqtt-time of the last element to then scroll later
@@ -170,7 +154,7 @@ if __name__ == "__main__":
             
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
-            LOGGER.info("No remaining entry without the right extra_infos field (version=" + EXTRA_INFO_VERSION + ")")
+            LOGGER.info("No remaining entry without the right extra_infos field (version=" + queries.EXTRA_INFO_VERSION + ")")
             LOGGER.info("Last bulk contained " + str(length) + " entries")
             break
 
