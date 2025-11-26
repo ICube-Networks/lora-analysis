@@ -79,7 +79,7 @@ DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # 7 days
 
 #debuging
 DEVADDR_TEST_STOP = '' #021b94c2'
-DEVADDR_TEST_DEBUG = '021b94c2'
+DEVADDR_TEST_DEBUG = '' #021b94c2'
         
 # --------------------------------------------------------
 #       ELASTIC SEARCH QUERIES
