@@ -52,7 +52,7 @@ from datetime import datetime, timedelta
 #logs
 import logging
 logger_preprocflow = logging.getLogger('interpkt_distribution')
-logger_preprocflow.setLevel(logging.DEBUG)
+logger_preprocflow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 # debug of the ES connection
