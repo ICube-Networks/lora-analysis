@@ -683,7 +683,7 @@ class Application:
             #index_drops = devAddr_pending_df['devAddr'].isin(devAddr_proc).index
             logger_preprocflow.info("\t> " + str(len(devAddr_proc)) + " to drop")
             #devAddr_pending_df.drop(index_drops, inplace = True)
-            devAddr_pending_df = devAddr_pending_df[devAddr_pending_df['devAddr'].isin(devAddr_proc) == False]
+            devAddr_list = devAddr_list[devAddr_list.isin(devAddr_proc) == False]
             logger_preprocflow.info("\t> ... dropped")
     
     
