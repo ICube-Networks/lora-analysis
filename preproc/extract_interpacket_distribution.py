@@ -78,6 +78,7 @@ DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # 7 days
 
 
 #debuging
+DEVADDR_STOP_BEFORE = ''
 DEVADDR_TEST_DEBUG_DEVADDR = '' #037d345d ' #021b94c2'
 DEVADDR_TEST_DEBUG_MINTIME = ''  #2024-10-18T10:07:46.000000Z' be careful about the padding with the exact nb of digits
 
@@ -696,6 +697,10 @@ class Application:
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
     
         for devAddr in devAddr_list :
+            if DEVADDR_STOP_BEFORE == devAddr:
+                print("------- Application interrupted -- Stop before " + DEVADDR_STOP_BEFORE  + "  ----- ")
+                break
+        
         
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
