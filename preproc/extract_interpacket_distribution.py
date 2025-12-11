@@ -78,9 +78,9 @@ DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # 7 days
 
 
 #debuging
-DEVADDR_TEST_STOP = '' #021b94c2'
-DEVADDR_TEST_DEBUG = '' #021b94c2'
-        
+DEVADDR_TEST_DEBUG_DEVADDR = '' #037d345d ' #021b94c2'
+DEVADDR_TEST_DEBUG_MINTIME = ''  #2024-10-18T10:07:46.000000Z' be careful about the padding with the exact nb of digits
+
 # --------------------------------------------------------
 #       ELASTIC SEARCH QUERIES
 # --------------------------------------------------------
@@ -305,13 +305,16 @@ def eq_query_get_interpkt(devAddr):
     
     #for all the packets generated with this devAddr
     while True:
-    
+        #time_min is specified for a specific debug devaddr
+        if devAddr == DEVADDR_TEST_DEBUG_DEVADDR and time_min == 0 and len(DEVADDR_TEST_DEBUG_MINTIME) > 0:
+            time_min = DEVADDR_TEST_DEBUG_MINTIME
+
         #send the elastic search query to the server
         response, time_min = es_query_get_devAddr_tx(devAddr, time_min)
         logger_preprocflow.debug("New Elastic Search query (" + str(tools.queries.QUERY_NB_RESULT) + " records at most)")
         if response is None:
             return(None)
-            
+                
         #no remaining response
         if (len(response["hits"]) == 0):
             logger_preprocflow.error("No packet matches for devAddr " + devAddr)
@@ -341,7 +344,7 @@ def eq_query_get_interpkt(devAddr):
                         break
                
                         
-                # bug  2025-08-02T07:58:18.677127Z, 2025-08-02T07:58:18.677127Z
+                # bug
                 if found is False:
                     print("No packet for this duplicate")
                     print(str(len(flows_for_thisDevAddr)) + " different flows")
@@ -349,13 +352,13 @@ def eq_query_get_interpkt(devAddr):
                     print("id: "+ current_packet_data["fields"]["_id"][0])
                     print("copy of : " + current_packet_data["fields"]["dup_infos.copy_of"][0])
                     print("------")
-                    for flow in flows_for_thisDevAddr:
-                        print(flow[flow["pd_distrib"]["time"] == '2023-08-16T12:48:43.692573Z' ])
-                    print("------")
                     #print(flows_for_thisDevAddr)
                   
                 
                     logger_preprocflow.error("No packet matches this duplicate " + current_packet_data["fields"]["_id"][0] + " copy of " + current_packet_data["fields"]["dup_infos.copy_of"][0])
+                    
+                    for flow in flows_for_thisDevAddr:
+                        print(flow['pd_distrib']['_id'].to_string())
                     
                     exit(2)
                 
@@ -642,9 +645,9 @@ class Application:
         """
 
         #if the string is not empty, DEBUG mode to collect info on ONE devaddr
-        if len(DEVADDR_TEST_DEBUG) > 0 :
-            devAddr_list = [DEVADDR_TEST_DEBUG]
-            logger_preprocflow.info("DEBUG for devaddr " + DEVADDR_TEST_DEBUG)
+        if len(DEVADDR_TEST_DEBUG_DEVADDR) > 0 :
+            devAddr_list = [DEVADDR_TEST_DEBUG_DEVADDR]
+            logger_preprocflow.info("DEBUG for devaddr " + DEVADDR_TEST_DEBUG_DEVADDR)
         #get the list of devaddrs in the elastic search DB
         else :
             devAddr_pending_df = es_query_get_devAddr()
@@ -654,7 +657,7 @@ class Application:
 
         # empty pandas dataframe (none read from the disk) -> let's create it
         # or if DEBUG mode for one devAddr
-        if self.pd_all_flows.empty is True or len(DEVADDR_TEST_DEBUG) > 0  :
+        if self.pd_all_flows.empty is True or len(DEVADDR_TEST_DEBUG_DEVADDR) > 0  :
             self.pd_all_flows = pd.DataFrame({'devAddr': [], 'fCnt_1st': [], 'fCnt_last': [], 'time_1st': [], 'time_last': [], 'median_interpkt_time_ms': [], 'max_interpkt_time_ms': [], 'min_interpkt_time_ms': [], 'nb_pkts': []})
 
         # Else, some have already been extracted from the disk
@@ -693,11 +696,6 @@ class Application:
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
     
         for devAddr in devAddr_list :
-
-            # stop test
-            if devAddr == DEVADDR_TEST_STOP:
-                print("------- Application manually interrupted (specific addr) ----- ")
-                break
         
             # get the new record(s) for this devAddr (one record per flow)
             pd_records = eq_query_get_interpkt(devAddr)
@@ -715,6 +713,11 @@ class Application:
                 logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
             else:
                 logger_preprocflow.info("\t" + devAddr + "\t0" )
+
+            #stop for the debug addr
+            if DEVADDR_TEST_DEBUG_DEVADDR == devAddr:
+                print("------- Application interrupted -- DEVADDR_TEST_DEBUG  ----- ")
+                exit(0)
 
             #exit condition
             if self.terminated:
@@ -743,14 +746,6 @@ if __name__ == "__main__":
     # load data that is on the disk (already read previously)
     pd_all_flows = load_from_disk(verbose=True)
     
-    
-    # ---- debug for one specific address -----
-    #devAddr = "0e7290de"
-    #print(pd_all_flows[pd_all_flows['devAddr'] == devAddr])
-    #pd_records = load_distribs_forDevAddr_from_disk(pd_all_flows, devAddr, verbose=False)       # complete distrib already processed
-    #pd_records = eq_query_get_interpkt(devAddr)      # distrib reextracted (not processed)
-    #print(pd_records)
-    #exit(0)
 
     # -- elastic search ----
     # extract from elastic search what was not read on the disk
