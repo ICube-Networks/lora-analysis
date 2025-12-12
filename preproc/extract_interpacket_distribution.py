@@ -62,6 +62,10 @@ logging.basicConfig(stream=sys.stdout)
 import signal
 import time
 
+# multiple proc
+import multiprocessing as mp
+
+
 
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
@@ -76,6 +80,9 @@ FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the file
 DELTA_FCNT_ABS_MAX = 10000              # absolute diff: if the counter diff exceeds DELTA
 DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # 7 days
 
+
+# multiprocess
+NB_PROC_MAX = 10
 
 #debuging
 DEVADDR_STOP_BEFORE = ''
@@ -269,7 +276,7 @@ def es_query_get_devAddr_tx(devAddr, time_min):
         )
     
     except:
-        self.terminated = True
+        #self.terminated = True
         return(None, None)
 
     
@@ -284,7 +291,7 @@ def es_query_get_devAddr_tx(devAddr, time_min):
     
     
 
-def eq_query_get_interpkt(devAddr):
+def eq_query_get_interpkt(devAddr, q, process_id):
     """ Elastic query to get the list of inter packet time for a given devAddr
         
     :param the devAddr to search in the DB.
@@ -471,7 +478,12 @@ def eq_query_get_interpkt(devAddr):
         logger_preprocflow.error("No flow for the devAddr " + str(devAddr))
         return(None)
 
-    return(pd_these_flows)
+    result = {
+        "devAddr": devAddr,
+        "pd_records": pd_these_flows
+    }
+    q.put(result)
+
 
 
        
@@ -636,8 +648,26 @@ class Application:
         self.terminated = True
         
        
-
+    # dequeue one element to store in in the resulting dataframe
+    def put_queued_result_in_dataframe(self, q):
+        result = q.get()
+        pd_records = result['pd_records']
+        devAddr = result['devAddr']
         
+        
+        # concatenation to the global pandaframe
+        if pd_records is not None :
+            if self.pd_all_flows.empty is True:
+                self.pd_all_flows = pd_records
+            else:
+                self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
+
+            #logs
+            logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0]) + "\t\t" + str(pd_records["nb_pkts"].sum())  )
+            logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
+        else:
+            logger_preprocflow.info("\t" + devAddr + " is faulty (pd_records is None) \t0" )
+            self.terminated = True
         
    
     def MainLoop( self ):
@@ -696,38 +726,46 @@ class Application:
         logger_preprocflow.info("> Reading new values in Elastic Search ( "+ str(len(devAddr_list)) +" )")
         logger_preprocflow.info("\tdevAddr\t\tNb flows\tNb pkts")
     
-        for devAddr in devAddr_list :
-            if DEVADDR_STOP_BEFORE == devAddr:
-                print("------- Application interrupted -- Stop before " + DEVADDR_STOP_BEFORE  + "  ----- ")
-                break
+    
+        if __name__ == '__main__':
+            nb_proc = 0
+            q = mp.Queue()
         
-        
-            # get the new record(s) for this devAddr (one record per flow)
-            pd_records = eq_query_get_interpkt(devAddr)
-            #print(pd_records.to_string())
+            for devAddr in devAddr_list :
             
-            # concatenation to the global pandaframe
-            if pd_records is not None :
-                if self.pd_all_flows.empty is True:
-                    self.pd_all_flows = pd_records
-                else:
-                    self.pd_all_flows = pd.concat([self.pd_all_flows, pd_records], ignore_index=True)
+                if DEVADDR_STOP_BEFORE == devAddr:
+                    logger_preprocflow.info("------- Application interrupted -- Stop before " + DEVADDR_STOP_BEFORE  + "  ----- ")
+                    break
+            
+                #read the result in the queue
+                if nb_proc == NB_PROC_MAX:
+                    self.put_queued_result_in_dataframe(q)
+                    nb_proc -= 1
+                            
+                # one process is terminated, start a new one for the new devaddr
+                # get the new record(s) for this devAddr (one record per flow)
+                p = mp.Process(target=eq_query_get_interpkt, args=(devAddr,q, nb_proc, ))
+                p.start()
+                nb_proc += 1
+                logger_preprocflow.info("   devAddr " + devAddr + " proc=" + str(nb_proc))
+                #print(pd_records.to_string())
 
-                #logs
-                logger_preprocflow.info("\t" + devAddr + "\t" + str(pd_records.shape[0]) + "\t\t" + str(pd_records["nb_pkts"].sum())  )
-                logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
-            else:
-                logger_preprocflow.info("\t" + devAddr + "\t0" )
 
-            #stop for the debug addr
-            if DEVADDR_TEST_DEBUG_DEVADDR == devAddr:
-                print("------- Application interrupted -- DEVADDR_TEST_DEBUG  ----- ")
-                exit(0)
+                #stop for the debug addr
+                if DEVADDR_TEST_DEBUG_DEVADDR == devAddr:
+                    print("------- Application interrupted -- DEVADDR_TEST_DEBUG  ----- ")
+                    exit(0)
 
-            #exit condition
-            if self.terminated:
-                print("------- Application interrupted ----- ")
-                break
+                #exit condition
+                if self.terminated:
+                    
+                    while(nb_proc != 0):
+                        logger_preprocflow.info("-- Waiting -- still " + str(nb_proc) + " processes are running")
+                        self.put_queued_result_in_dataframe(q)
+                        nb_proc -= 1
+                
+                    logger_preprocflow.info("------- Application interrupted ----- ")
+                    break
                 
 
       
