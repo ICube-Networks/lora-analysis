@@ -288,7 +288,7 @@ def es_query_get_devAddr_tx(devAddr, time_min):
     
     
 
-def eq_query_get_interpkt(devAddr, q, process_id):
+def eq_query_get_interpkt(devAddr, queue):
     """ Elastic query to get the list of inter packet time for a given devAddr
         
     :param the devAddr to search in the DB.
@@ -475,11 +475,14 @@ def eq_query_get_interpkt(devAddr, q, process_id):
         logger_preprocflow.error("No flow for the devAddr " + str(devAddr))
         return(None)
 
+    logger_preprocflow.info("child for devAddr " + devAddr + " has terminated")
+
+    #push the result to the queue
     result = {
         "devAddr": devAddr,
         "pd_records": pd_these_flows
     }
-    q.put(result)
+    queue.put(result)
 
 
 
@@ -766,7 +769,7 @@ class Application:
 
                 # Start a new provess for the new devaddr
                 # get the new record(s) for this devAddr (one record per flow)
-                proc = mp.Process(target=eq_query_get_interpkt, args=(devAddr, self.queue, len(self.proc_list), ))
+                proc = mp.Process(target=eq_query_get_interpkt, args=(devAddr, self.queue, ))
                 proc.start()
                 self.proc_list.append(proc)
                 logger_preprocflow.info(proc.name + " has started (devAddr =" +  devAddr + ")")
