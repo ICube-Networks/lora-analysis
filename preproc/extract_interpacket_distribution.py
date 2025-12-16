@@ -64,8 +64,7 @@ import time
 
 # multiple proc
 import multiprocessing as mp
-
-
+import time
 
 # parameters
 DEVADDR_COUNT_MAX = 10000000        # max number of devices to support
@@ -80,9 +79,8 @@ FILENAME_DISTRIB = myconfig.directory_data+'/distrib_'  # the prefix of the file
 DELTA_FCNT_ABS_MAX = 10000              # absolute diff: if the counter diff exceeds DELTA
 DELTA_INTERPKT_ABS_TIME_MAX = 604800000  # 7 days
 
-
 # multiprocess
-NB_PROC_MAX = 10
+NB_PROC_MAX = 8
 
 #debuging
 DEVADDR_STOP_BEFORE = ''
@@ -276,7 +274,6 @@ def es_query_get_devAddr_tx(devAddr, time_min):
         )
     
     except:
-        #self.terminated = True
         return(None, None)
 
     
@@ -633,24 +630,36 @@ class Application:
         
         """
         signal.signal(signal.SIGINT, lambda signal, frame: self._signal_handler() ) # protection against CTRL-C
-        self.terminated = False         # the process doesn't need to be terminated
         
-        #stats
+        #properties
         self.pd_all_flows = pd_all_flows
- 
+        self.queue = mp.Queue()
+        self.proc_list = []
+
 
     def _signal_handler( self ):
         """ Ctrl-c has been pressed
         
         """
+        
+        #retrieve recent results that just terminated
+        while not self.queue.empty():
+            result = self.queue.get()
+            self.put_queued_result_in_dataframe(result)
+            
+            
+        # save the pandas frame to the disk
+        save_to_disk(app.pd_all_flows)
+        for proc in app.proc_list:
+            print("kill proc " + proc.name)
+            proc.kill()
+        exit(0)
 
 
-        self.terminated = True
         
        
     # dequeue one element to store in in the resulting dataframe
-    def put_queued_result_in_dataframe(self, q):
-        result = q.get()
+    def put_queued_result_in_dataframe(self, result):
         pd_records = result['pd_records']
         devAddr = result['devAddr']
         
@@ -667,8 +676,8 @@ class Application:
             logger_preprocflow.debug("memory: "+ str(sys.getsizeof(self.pd_all_flows) / (1024 * 1024)) + " MB")
         else:
             logger_preprocflow.info("\t" + devAddr + " is faulty (pd_records is None) \t0" )
-            self.terminated = True
-        
+            # NB: this record has failed, but the corresponding devAddr will not be registered
+            # as processed. Will be considered during the next execution
    
     def MainLoop( self ):
         """ Ask for all the packets for each devAddr to store info in a pandas dataframe
@@ -728,26 +737,39 @@ class Application:
     
     
         if __name__ == '__main__':
-            nb_proc = 0
-            q = mp.Queue()
+
         
             for devAddr in devAddr_list :
             
+                # debug to stop before this devAddr
                 if DEVADDR_STOP_BEFORE == devAddr:
                     logger_preprocflow.info("------- Application interrupted -- Stop before " + DEVADDR_STOP_BEFORE  + "  ----- ")
                     break
             
-                #read the result in the queue
-                if nb_proc == NB_PROC_MAX:
-                    self.put_queued_result_in_dataframe(q)
-                    nb_proc -= 1
-                            
-                # one process is terminated, start a new one for the new devaddr
+                # read the queue (possible several results were queued)
+                if self.queue.empty():
+                    time.sleep(0.5)
+                while not self.queue.empty():
+                    result = self.queue.get()
+                    self.put_queued_result_in_dataframe(result)
+                    
+                # remove terminated process
+                while len(self.proc_list) >= NB_PROC_MAX:
+                    for proc in self.proc_list:
+                        if proc.is_alive() is False:
+                            logger_preprocflow.info(proc.name + " has terminated")
+                            self.proc_list.remove(proc)
+                    #sleep to avoid wasting computational resources
+                    if len(self.proc_list) >= NB_PROC_MAX :
+                        time.sleep(0.5)
+                    logger_preprocflow.info(str(len(self.proc_list)) + " running processes")
+
+                # Start a new provess for the new devaddr
                 # get the new record(s) for this devAddr (one record per flow)
-                p = mp.Process(target=eq_query_get_interpkt, args=(devAddr,q, nb_proc, ))
-                p.start()
-                nb_proc += 1
-                logger_preprocflow.info("   devAddr " + devAddr + " proc=" + str(nb_proc))
+                proc = mp.Process(target=eq_query_get_interpkt, args=(devAddr, self.queue, len(self.proc_list), ))
+                proc.start()
+                self.proc_list.append(proc)
+                logger_preprocflow.info(proc.name + " has started (devAddr =" +  devAddr + ")")
                 #print(pd_records.to_string())
 
 
@@ -756,16 +778,7 @@ class Application:
                     print("------- Application interrupted -- DEVADDR_TEST_DEBUG  ----- ")
                     exit(0)
 
-                #exit condition
-                if self.terminated:
-                    
-                    while(nb_proc != 0):
-                        logger_preprocflow.info("-- Waiting -- still " + str(nb_proc) + " processes are running")
-                        self.put_queued_result_in_dataframe(q)
-                        nb_proc -= 1
                 
-                    logger_preprocflow.info("------- Application interrupted ----- ")
-                    break
                 
 
       
