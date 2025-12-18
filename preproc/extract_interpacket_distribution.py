@@ -349,25 +349,21 @@ def eq_query_get_interpkt(devAddr, queue):
                         break
                
                         
-                # bug
+                # bug: no dup found -> discard this duplicated packet
                 if found is False:
-                    print("No packet for this duplicate")
-                    print(str(len(flows_for_thisDevAddr)) + " different flows")
-                    print("-----")
-                    print("id: "+ current_packet_data["fields"]["_id"][0])
-                    print("copy of : " + current_packet_data["fields"]["dup_infos.copy_of"][0])
-                    print("------")
+                    logger_preprocflow.error("No packet for this duplicate")
+                    logger_preprocflow.error("-----")
+                    logger_preprocflow.error("id: "+ current_packet_data["fields"]["_id"][0])
+                    logger_preprocflow.error("copy of : " + current_packet_data["fields"]["dup_infos.copy_of"][0])
+                    logger_preprocflow.error("------")
                     #print(flows_for_thisDevAddr)
                   
                 
                     logger_preprocflow.error("No packet matches this duplicate " + current_packet_data["fields"]["_id"][0] + " copy of " + current_packet_data["fields"]["dup_infos.copy_of"][0])
                     
-                    for flow in flows_for_thisDevAddr:
-                        print(flow['pd_distrib']['_id'].to_string())
-                    
-                    exit(2)
+                    continue
                 
-                # next packet, this duplicated packet is processed
+                # next packet, this duplicated packet is processed (or discarded)
                 continue
                 
             # -- The rest of this loop corresponds to a non duplicated packet --
