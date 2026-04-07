@@ -57,7 +57,7 @@ DELETE /lora-index-new
 
 * force the mapping to avoid ambiguity and to change field types
 
-````
+```
 PUT /lora-index-new
 {
   "mappings": {
@@ -259,6 +259,39 @@ POST _reindex
   },
   "script": {
     "source": "ctx._source['src_version'] = 3; ctx._source['time']  = ctx._source.remove('time');  ctx._source.txInfo.type = ctx._source.txInfo.remove('modulation'); ctx._source.txInfo.modulation = [:]; ctx._source.txInfo.modulation.lora = ctx._source.txInfo.remove('loRaModulationInfo'); ctx._source.txInfo.modulation.type  = ctx._source.txInfo.remove('type'); ctx._source.txInfo.modulation.lora.codeRate = 'C_' + ctx._source.txInfo.modulation.lora.codeRate.replace('/','_'); ctx._source.devAddr = ctx._source.extra_infos.phyPayload.macPayload.fhdr.devAddr; ctx._source.mType = ctx._source.extra_infos.phyPayload.mhdr.mType; ctx._source.rxInfo.snr = ctx._source.rxInfo.remove('loRaSNR'); ctx._source.rxInfo.gatewayId = ctx._source.rxInfo.remove('gatewayID'); ctx._source.rxInfo.uplinkIdText = ctx._source.rxInfo.remove('uplinkID');"
+  }
+}
+
+```
+
+# Reindex for anonymous 
+
+```
+
+POST _reindex
+{
+  "source": {
+    "index": "lora-strasbourg",
+    "query": {
+      "bool": {
+        "filter": [
+          {
+            "range": {
+              "time": {
+                "gte": "2021-03-26T16:58:54.571867Z",
+                "lte": "2021-03-26T16:58:54.571867Z"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "dest": {
+    "index": "lora-strasbourg-anonymous"
+  },
+  "script": {
+    "source": "ctx._source.remove('phyPayload'); ctx._source.rxInfo.remove('location'); ctx._source.rxInfo.gatewayId_hash  = ctx._source.rxInfo.remove('gatewayId').hashCode(); "
   }
 }
 

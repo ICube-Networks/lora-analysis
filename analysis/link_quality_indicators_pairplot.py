@@ -1,8 +1,10 @@
 """ Link quality indicators correlation .
 
-This scripts selects randomly X packets and plot 
+This scripts selects randomly NUMPACKETS_MAX packets and plot 
 the correlation between different link quality indicators and features
 
+We limit the selection to NUMPACKETS_MAX else the plot contains too much information 
+(the value is considered statistically significant)
 
 """
 
@@ -51,7 +53,7 @@ logging.basicConfig(stream=sys.stdout)
 
 
 #variables
-NUMPACKETS_MAX = 10000
+NUMPACKETS_MAX = 40000
 
 
 def  es_query_packets_list_random():
@@ -76,7 +78,7 @@ def  es_query_packets_list_random():
         ).search(
             index=myconfig.index_name,
             size=min(NUMPACKETS_MAX, tools.queries.QUERY_NB_RESULT),
-            query=tools.queries.QUERY_DATA,
+            query=tools.queries.QUERY_DATA_WITH_CHANNEL,
             source=False,
             fields=[
                 "rxInfo.rssi",
@@ -157,7 +159,18 @@ def  es_query_packets_list_random():
 
 
 
-
+  
+# create customized scatterplot that first filters out NaNs in feature pair
+def scatterFilter(x, y, **kwargs):
+    
+    interimDf = pd.concat([x, y], axis=1)
+    interimDf.columns = ['x', 'y']
+    interimDf = interimDf[(~ pd.isnull(interimDf.x)) & (~ pd.isnull(interimDf.y))]
+    
+    ax = plt.gca()
+    ax = plt.plot(interimDf.x.values, interimDf.y.values, 'o', **kwargs)
+    
+    
 def plot_SF_SNR_RSSI(results_df, figname):
     """Plot the SF distribution.
     
@@ -165,21 +178,31 @@ def plot_SF_SNR_RSSI(results_df, figname):
     
     :param pandas dataFrame containing the information
     """
-
- 
     # Create a seaborn visualization
     sns.set()
     sns.set_theme(style='whitegrid')
     sns.set(font_scale=1)
 
-    g = sns.pairplot(
-        data=results_df,
-        diag_kind="kde",
+    #g = sns.pairplot(
+#        data=results_df,
+#        diag_kind="kde",
 #        corner=True,
-    )
-    g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)     # no warning if we have no variance for one variable
+#    )
+    #g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)     # no warning if we have no variance for one variable
     
-  
+
+    # Create an instance of the PairGrid class.
+    g = sns.PairGrid(data=results_df)
+
+    # Map a scatter plot to the upper triangle
+    g = g.map_upper(sns.scatterplot)
+
+    # Map a histogram to the diagonal
+    g = g.map_diag(plt.hist,  edgecolor='k')
+
+    # Map a KDE to the lower triangle
+    g.map_lower(sns.kdeplot, fill=True, bw_method=0.3, warn_singular=False)
+
 
     # save the figure
     fig = g.figure.savefig(figname)
@@ -200,10 +223,19 @@ if __name__ == "__main__":
     
     #elastic search query, transformed in a panda dataFrame
     results_df = es_query_packets_list_random()
-    # remove outliers
-    results_df = results_df[results_df['rssi'] < 0]
-    logger_quality_corr.info(results_df)
     
+    # remove outliers
+    #results_df = results_df[results_df['rssi'] < 0]
+    
+    # filter null fields (incomplete records)
+    results_df = results_df[
+    (~ pd.isnull(results_df.rssi))
+    & (~ pd.isnull(results_df.loRaSNR))
+    & (~ pd.isnull(results_df.channel))
+    & (~ pd.isnull(results_df.spreadingFactor))
+    ]
+    logger_quality_corr.info(results_df)
+
     #pairplot for the multiple linkqual indicators
     plot_SF_SNR_RSSI(results_df[['rssi', 'loRaSNR']], "figures/linkqual_rssi_snr_pairplots.pdf")
     

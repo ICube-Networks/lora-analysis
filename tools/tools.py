@@ -357,7 +357,7 @@ class queries:
             }
         }
     """
-    Query to match all the documents that are NOT data packets (extra_infos mtype=2).
+    Query to match all the documents that are data packets (extra_infos mtype=2).
     """
 
     # the data frames only
@@ -376,6 +376,34 @@ class queries:
                         }
                     },
                     {"exists": {"field": "dup_infos.is_duplicate" } },
+                ]
+            }
+        }
+    """
+    Query to match all the documents that are data packets and with a channel info.
+    """
+
+    # the data frames only
+    QUERY_DATA_WITH_CHANNEL =  {
+            "bool": {
+              "must": [
+                    { "term": {"extra_infos.phyPayload.mhdr.mType": "2"}    },
+                    { "match": {"txInfo.modulation.type": "LORA"}},
+                    {
+                        "range":{
+                            "time":{
+                                 "gte": DATE_START_DATASET,
+                                 #"lte": "2020-12-30",
+                                 "format": "year_month_day",
+                            }
+                        }
+                    },
+                    {"exists": {"field": "dup_infos.is_duplicate" } },
+                    {"exists": {"field": "rxInfo.channel" } },
+                    {"exists": {"field": "rxInfo.snr" } },
+                    {"exists": {"field": "rxInfo.rssi" } },
+                    {"exists": {"field": "rxInfo.crcStatus" } },
+                    {"exists": {"field": "txInfo.modulation.lora.spreadingFactor" } },
                 ]
             }
         }
