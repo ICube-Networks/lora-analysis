@@ -5,7 +5,7 @@ USER=`cat ../config/myconfig.py | grep "user" | cut -d '"' -f 2`
 PASSWORD=`cat ../config/myconfig.py | grep "password" | cut -d '"' -f 2`
 HOSTNAME=`cat ../config/myconfig.py | grep "hostname" | cut -d '"' -f 2`
 INDEX_NAME_OUTPUT='lora-strasbourg-anonymous'
-INDEX_NAME_INPUT='lora-strasbourg'
+INDEX_NAME_INPUT='lora-strasbourg-full'
 
 
 echo "Reindexing from $INDEX_NAME_INPUT to $INDEX_NAME_OUTPUT"
