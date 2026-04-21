@@ -136,7 +136,7 @@ All these scripts can be stopped and restarted at any time: they will continue w
 
 
 
-## Analaysis
+## Analysis
 
 You should use a local venv for your Python packages, and activate it (`source .venv/bin/activate`). Please see the install section.
 
