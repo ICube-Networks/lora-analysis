@@ -78,17 +78,20 @@ def plot_operators_cdf(devaddr_df):
     
     g = sns.catplot(
         data = devaddr_df,
-        y = 'operator',
-        x = 'doc_count',
-        log_scale =  (True, False),
-        aspect = 0.75,
+        x = 'operator',
+        y = 'doc_count',
+        log_scale =  (False, True),
+        aspect = 1.75,
         margin_titles = True,
     )
-    g.set(ylabel='Operators', xlabel='Number of packets')
-       
-        
+    g.set_xticklabels(rotation=90, fontsize=9)
+    g.set_yticklabels(fontsize=10)
+    #g.set(xlabel='Operators', ylabel='Number of packets')
+    plt.xlabel('Operators', fontsize=10)
+    plt.ylabel('Number of packets', fontsize=10)
+
     #save figure
-    #plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
+    plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
     g.figure.savefig("figures/allpackets_operators.pdf")
     g.figure.clf()
          
@@ -210,17 +213,6 @@ if __name__ == "__main__":
  
     """
     
-    # ------- Traffic ---------
-    # class A/B, with and wo acks
-    
-    
-    param ={}
-    fieldnames = { "fieldname1" : 'extra_infos.phyPayload.macPayload.fhdr.fCtrl.classB', "fieldname2": 'extra_infos.phyPayload.macPayload.fhdr.fCtrl.ack'}
-    results_df = tools.elasticsearch_query_count_docs_with_twofields(fieldnames)
-    plot_class_ack_distrib(results_df, fieldnames, "figures/allpackets_class_ack_distrib.pdf")
-    
-
-
     
     # ----- operator ---------
     # distribution
@@ -232,8 +224,25 @@ if __name__ == "__main__":
     
     #shorten this specific operator (too long string)
     devaddr_df.replace('Shenzhen Tencent Computer Systems Company Limited', 'Shenzhen Tencent', inplace = True)
-    
+    devaddr_df.replace('NTT (Nippon Telephone and Telegraph)', 'NTT', inplace = True)
+
     #regroup by operator, removing the devAddr field
     operators_df = devaddr_df.groupby('operator')['doc_count'].sum().reset_index().sort_values(by=['doc_count'], ascending=False).reset_index(drop=True)
 
     plot_operators_cdf(operators_df)
+
+
+    exit(0)
+    
+    
+
+    # ------- Traffic ---------
+    # class A/B, with and wo acks
+    
+    
+    param ={}
+    fieldnames = { "fieldname1" : 'extra_infos.phyPayload.macPayload.fhdr.fCtrl.classB', "fieldname2": 'extra_infos.phyPayload.macPayload.fhdr.fCtrl.ack'}
+    results_df = tools.elasticsearch_query_count_docs_with_twofields(fieldnames)
+    plot_class_ack_distrib(results_df, fieldnames, "figures/allpackets_class_ack_distrib.pdf")
+    
+
