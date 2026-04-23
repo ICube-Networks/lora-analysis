@@ -53,6 +53,7 @@ import logging
 logger_flow = logging.getLogger('flow_distribution')
 logger_flow.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
+logging.getLogger("fontTools.subset").setLevel(logging.WARNING)
 
 
 # read distributions from the disk (preprocessed)
@@ -61,7 +62,7 @@ import extract_interpacket_distribution
 
 
 #parameters
-NB_PKTS_MIN = 50        # minimum number of packets for a given devAddr (else discarded) to compute the median value
+NB_PKTS_MIN = 50        # minimum number of packets for a given devAddr (else discarded)
 FNCT_DIFF_MAX = 100     # maximum average fnct_diff for a flow
 NB_PLOTS = 12           # number of plots for individual distributions
 NB_COLS = 3             # max number of plots in a line
@@ -208,8 +209,8 @@ def plot_interpkt_nbpkts(pd_all_flows):
     g.figure.clf()
   
     # corr coeff
-    r,p = scipy.stats.pearsonr(pd_all_flows['median_interpkt_time_ms'], pd_all_flows["nb_pkts"])
-    logger_flow.info('Pearson coefficient(median_interpkt_time_ms/nb_pkts) =' + str(r))
+    r,p = scipy.stats.pearsonr(pd_all_flows['mean_interpkt_time_ms'], pd_all_flows["nb_pkts"])
+    logger_flow.info('Pearson coefficient(mean_interpkt_time_ms/nb_pkts) =' + str(r))
     logger_flow.info('\t\t> p-value = ' + str(p))
     
 
@@ -226,7 +227,7 @@ def plot_PRR_distrib(pd_all_flows):
     sns.set()
     sns.set_theme(style='whitegrid')
     sns.set(font_scale=1)
-    values = 1 / pd_all_flows['median_fCnt_diff']
+    values = pd_all_flows['nb_pkts']  / (pd_all_flows['fCnt_last'] - pd_all_flows['fCnt_1st'])
 
     g = sns.ecdfplot(
         values,
@@ -252,14 +253,14 @@ def plot_SF_PRR(pd_all_flows):
     
     """
     
-    # extract for each flow the SF and PRR (median values)
+    # extract for each flow the SF and PRR (mean values)
     # NB: SF is mostly constant for a flow
     values = []
     for index, flow in pd_all_flows.iterrows():    
         pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(flow['devAddr'],  flow['time_1st'])
         record = {
-            'PRR' : 1 / pd_distrib['fCnt_diff'].median(),
-            'SF' : round(pd_distrib['SF'].median()),
+            'PRR' : 1 / pd_distrib['fCnt_diff'].mean(),
+            'SF' : round(pd_distrib['SF'].mean()),
             'nb_pkts' : pd_distrib.size
         }
         values.append(record)
@@ -323,13 +324,13 @@ def plot_nbdups_prr(pd_all_flows):
     
     """
     
-    # extract for each flow the SF and PRR (median values)
+    # extract for each flow the SF and PRR (mean values)
     values = []
     for index, flow in pd_all_flows.iterrows():
         pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(flow['devAddr'],  flow['time_1st'])
         record = {
             'PRR' : 1 / pd_distrib['fCnt_diff'].mean(),
-            'nb_duplicates' : pd_distrib['nb_duplicates'].median(),
+            'nb_duplicates' : pd_distrib['nb_duplicates'].mean(),
             'nb_pkts' : pd_distrib.size
         }
         values.append(record)
@@ -349,7 +350,7 @@ def plot_nbdups_prr(pd_all_flows):
         size="nb_pkts",
         sizes=(15, 200)
     )
-    g.set(xlabel='Median number of duplicates received', ylabel='Average packet Reception Rate')
+    g.set(xlabel='Mean number of duplicates received', ylabel='Average packet Reception Rate')
 
     #save figure
     g.figure.savefig("figures/flow_nbdups_PRR_pairplot.png", dpi=250)
@@ -413,7 +414,11 @@ if __name__ == "__main__":
         logger_flow.debug("\t\t> "+ str(len(pd_all_flows)) + " devAddrs in the disk")
 
 
-
+    #mean inter packet time (first and last frame counters vs. time)
+    pd_all_flows['mean_interpkt_time_ms'] = (
+        (pd_all_flows['time_last'] - pd_all_flows['time_1st']) /
+        (pd_all_flows['fCnt_last'] - pd_all_flows['fCnt_1st'])
+    ).dt.total_seconds() * 1000
 
 
     # --- filtering ---
@@ -456,7 +461,7 @@ if __name__ == "__main__":
     plot_interpkt_time_distribution_grid(pd_all_flows=pd_all_flows, plot_list=plot_list, count=NB_PLOTS, nb_cols=NB_COLS)
 
     #info
-    logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time_ms'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
+    logger_flow.info("Analysis: " + str(len(pd_all_flows['mean_interpkt_time_ms'])) + " / " + str(len(pd_all_flows['median_interpkt_time_ms'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
     
   
   
@@ -464,16 +469,25 @@ if __name__ == "__main__":
     xtics = {}
     xtics['values'] = [1, 60, 3600, 86400, 604800, 2419200, 29030400]
     xtics['names'] = ["1s", "1min", "1h", "1d", "1w", "1m", "1y" ]
-
-    # plot the EDCF of the median inter packet time (remove samples with not enough packets)
+  
+    # plot the EDCF of the mean and median inter packet time (remove samples with not enough packets)
     plot_interpkt_ecdf(
-        values=np.ceil(pd_all_flows['median_interpkt_time_ms']/1000),     # keep only integers
-        figname="figures/flow_distribution_interpkttime.pdf",
-        xlabel='Inter pkt time',
+        values=np.ceil(pd_all_flows['mean_interpkt_time_ms']/1000),     # keep only integers
+        figname="figures/flow_distribution_interpkttime_mean.pdf",
+        xlabel='Mean inter pkt time',
         xtics_vals = xtics['values'][0:5],
         xtics_names = xtics['names'][0:5],
 
     )
+    plot_interpkt_ecdf(
+        values=np.ceil(pd_all_flows['median_interpkt_time_ms']/1000),     # keep only integers
+        figname="figures/flow_distribution_interpkttime_median.pdf",
+        xlabel='Median inter pkt time',
+        xtics_vals = xtics['values'][0:5],
+        xtics_names = xtics['names'][0:5],
+
+    )
+    
     
     # EDCF of the flow duration
     plot_interpkt_ecdf(
@@ -483,8 +497,9 @@ if __name__ == "__main__":
         xtics_vals = xtics['values'][2:7],
         xtics_names = xtics['names'][2:7],
     )
-
+    
+    
     #correlation between inter pkt time / nb packets
-    plot_interpkt_nbpkts(pd_all_flows[['mean_fCnt_diff', 'median_fCnt_diff', 'max_fCnt_diff', 'median_interpkt_time_ms', 'nb_pkts']])
+    plot_interpkt_nbpkts(pd_all_flows[['mean_fCnt_diff', 'median_fCnt_diff', 'max_fCnt_diff', 'mean_interpkt_time_ms', 'median_interpkt_time_ms', 'nb_pkts']])
 
 
