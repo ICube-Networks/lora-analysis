@@ -50,6 +50,21 @@ To get an entry with its Phy payload
 		}
 ```
 
+Count the number of packets with the wrong extra_info version
+
+
+```
+GET /lora-strasbourg-full/_count?pretty=true
+	{
+	  "query": {
+	    "bool": {
+	      "must": [
+          {"term": {"extra_infos.version": "1.1"}}
+        ]        
+      }
+	}
+}
+```
 
 
 # no-dup crawling
