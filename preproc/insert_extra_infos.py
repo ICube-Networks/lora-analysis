@@ -93,7 +93,7 @@ if __name__ == "__main__":
         ).search(
             index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
-            query=QUERY_NOEXTRAINFO_EXIST,
+            query=tools.queries.QUERY_NOEXTRAINFO_EXIST,
         )
 
         # num of records
@@ -110,12 +110,13 @@ if __name__ == "__main__":
         # reinit the next bulk update query
         bulk_update = []
 
+
         # one update per doc
         for num, doc in enumerate(response['hits']['hits']):
                     
             # has this record already extra info with the right info?
             try:
-                assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.VERSION)
+                assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.EXTRA_INFO_VERSION)
                 
             except (KeyError, AssertionError) as e:
                 #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
@@ -129,13 +130,13 @@ if __name__ == "__main__":
                     print(doc['_source'].__contains__('phyPayload'))
                     exit(2)
                   
-                #construct the nex update for this id (decoding the LoRa frame)
+                #construct the next update for this id (decoding the LoRa frame)
                 req_update = doc['_source']
                 req_update['_index']         = myconfig.index_name
                 req_update['_id']            = doc['_id']
-                req_update['extra_infos']   = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])         # use the previous doc
-                #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
-                  
+                req_update['extra_infos']   = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
+                 #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+
                 # insert this update to the current sequence
                 bulk_update.append(req_update)
                 LOGGER.debug(bulk_update)
@@ -159,5 +160,5 @@ if __name__ == "__main__":
             break
 
 
-clientES.transport.close()
-exit(0)
+    clientES.transport.close()
+    exit(0)

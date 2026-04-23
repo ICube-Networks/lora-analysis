@@ -63,7 +63,8 @@ import extract_interpacket_distribution
 #parameters
 NB_PKTS_MIN = 50        # minimum number of packets for a given devAddr (else discarded) to compute the median value
 FNCT_DIFF_MAX = 100     # maximum average fnct_diff for a flow
-NB_PLOTS = 16           # number of plots for individual distributions
+NB_PLOTS = 12           # number of plots for individual distributions
+NB_COLS = 3             # max number of plots in a line
 
 
 
@@ -150,7 +151,7 @@ def plot_interpkt_time_distribution_grid(pd_all_flows, plot_list, count, nb_cols
     
     
 
-def plot_interpkt_ecdf(values, figname, xlabel):
+def plot_interpkt_ecdf(values, figname, xlabel, xtics_vals, xtics_names):
     """ Plot a distribution (pd dataframe) with an ECDF
         
     :param distribution: a pandas dataframe with the data to plot
@@ -164,17 +165,15 @@ def plot_interpkt_ecdf(values, figname, xlabel):
         values,
         log_scale=True
     )
-    g.set(xlabel=xlabel, ylabel='Cumulative Distribution')
-    
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel('Cumulative Distribution', fontsize=12)
+
     # remove values under 1s from the x-coordinates
     g.set(xlim=(values.min(), values.max()))
     
     #label with the typical units of time
-    xvalues = [60, 3600, 86400, 604800, 2419200]
-    labels = ["1min", "1h", "1d", "1w", "1m" ]
-    g.set_xticks(xvalues, labels=labels)
-    
-    
+    g.set_xticks(xtics_vals, labels=xtics_names, fontsize=11)
+        
     #save figure
     plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
     g.figure.savefig(figname)
@@ -205,7 +204,7 @@ def plot_interpkt_nbpkts(pd_all_flows):
     g.map_lower(sns.kdeplot, levels=4, color=".2", warn_singular=False)
     
     #save figure
-    g.figure.savefig("figures/flow_interpkttime_nbpkts_correlation.pdf")
+    g.figure.savefig("figures/flow_interpkttime_nbpkts_correlation.png", dpi=250)
     g.figure.clf()
   
     # corr coeff
@@ -281,13 +280,13 @@ def plot_SF_PRR(pd_all_flows):
     g.set(xlabel='Spreading Factor', ylabel='Packet Reception Rate')
 
     #save figure
-    g.figure.savefig("figures/flow_SF_PRR_pairplot.pdf")
+    g.figure.savefig("figures/flow_SF_PRR_pairplot.png", dpi=250)
    
  
 
                 
 def plot_nbdups_timedistrib(pd_flat_values):
-    """ Pairplot SF and PRR
+    """ Heatmap of the nb of duplicates per hour
         
     :param distribution: a pandas dataframe with the flows 
     
@@ -353,8 +352,7 @@ def plot_nbdups_prr(pd_all_flows):
     g.set(xlabel='Median number of duplicates received', ylabel='Average packet Reception Rate')
 
     #save figure
-    g.figure.savefig("figures/flow_nbdups_PRR_pairplot.pdf")
-
+    g.figure.savefig("figures/flow_nbdups_PRR_pairplot.png", dpi=250)
 
 
 
@@ -433,8 +431,7 @@ if __name__ == "__main__":
     logger_flow.info("\t\t> removed "+ str(nb_records_minpkts - nb_records_maxfnctdiff) + " flows with a too high fnctdiff (>=" + str(FNCT_DIFF_MAX) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " flows to process")
 
-        
-   
+           
     
     # --- plots per flow ---
     
@@ -446,7 +443,7 @@ if __name__ == "__main__":
     
     # correlation nb_dups / PRR
     plot_nbdups_prr(pd_all_flows)
-    exit(10)
+
     
     
   
@@ -455,31 +452,36 @@ if __name__ == "__main__":
     
     # plot a grid of distributions (randomly selected flows)
     nb_plots = min(NB_PLOTS, len(pd_all_flows))
-    nb_cols = math.ceil(math.sqrt(nb_plots))
     plot_list = random.choices(range(0,len(pd_all_flows)-1), k=nb_plots)
-    plot_interpkt_time_distribution_grid(pd_all_flows=pd_all_flows, plot_list=plot_list, count=NB_PLOTS, nb_cols=nb_cols)
+    plot_interpkt_time_distribution_grid(pd_all_flows=pd_all_flows, plot_list=plot_list, count=NB_PLOTS, nb_cols=NB_COLS)
 
     #info
     logger_flow.info("Analysis: " + str(len(pd_all_flows['median_interpkt_time_ms'])) + " / " +  str(len(pd_all_flows)) + " devAddr are significant (min "+str(NB_PKTS_MIN)+" pkts / total)")
     
   
   
-  
-  
     # --- plots inter packet times ---
+    xtics = {}
+    xtics['values'] = [1, 60, 3600, 86400, 604800, 2419200, 29030400]
+    xtics['names'] = ["1s", "1min", "1h", "1d", "1w", "1m", "1y" ]
 
     # plot the EDCF of the median inter packet time (remove samples with not enough packets)
     plot_interpkt_ecdf(
-        values=pd_all_flows['median_interpkt_time_ms']/1000,
+        values=np.ceil(pd_all_flows['median_interpkt_time_ms']/1000),     # keep only integers
         figname="figures/flow_distribution_interpkttime.pdf",
-        xlabel='Inter pkt time'
+        xlabel='Inter pkt time',
+        xtics_vals = xtics['values'][0:5],
+        xtics_names = xtics['names'][0:5],
+
     )
     
     # EDCF of the flow duration
     plot_interpkt_ecdf(
-        values=(pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds(),
+        values=np.ceil((pd_all_flows['time_last'] - pd_all_flows['time_1st']).dt.total_seconds()/3600)*3600,    #to cut the x for less than 1 hour values (neglible)
         figname="figures/flow_distribution_duration.pdf",
-        xlabel="Flow duration"
+        xlabel='Flow duration',
+        xtics_vals = xtics['values'][2:7],
+        xtics_names = xtics['names'][2:7],
     )
 
     #correlation between inter pkt time / nb packets

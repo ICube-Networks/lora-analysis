@@ -11,7 +11,12 @@ import sys
 
 import pprint
 
-VERSION = "1.0"
+#hash
+import hashlib
+
+#parameters
+EXTRA_INFO_VERSION = "1.1"
+
 
 MTYPE_JOIN_REQUEST = 0
 MTYPE_JOIN_ACCEPT = 1
@@ -32,7 +37,7 @@ def get_mtype(byte):
 def process_phypayload(phypayload):
     """ process LoRaWAN Gateway PHYPayload """
     extra_infos = {}
-    extra_infos['version'] = VERSION
+    extra_infos['version'] = EXTRA_INFO_VERSION
     extra_infos['phyPayload'] = {}
 
     if phypayload == "":
@@ -44,7 +49,6 @@ def process_phypayload(phypayload):
     bin_data['macPayload'] = bin_data['phypayload'][1:-4]
     bin_data['mhdr'] = bin_data['phypayload'][0]
     bin_data['mic'] = bin_data['phypayload'][-4:]
-    
 
     if len(bin_data['phypayload']) == 1 + len(bin_data['macPayload']) + len(bin_data['mic']):
         pass
@@ -59,7 +63,8 @@ def process_phypayload(phypayload):
     extra_infos['phyPayload'].update(decode_mhdr(bin_data['mhdr']))
     extra_infos['phyPayload']['macPayload'] = {}
     extra_infos['phyPayload']['mic'] = binascii.hexlify(bin_data['mic']).decode()  #json compliant
-
+    extra_infos['phyPayload']['length'] = len(bin_data['phypayload'])
+ 
     mtype = extra_infos['phyPayload']['mhdr']['mType']
 
     if mtype == MTYPE_JOIN_ACCEPT:
@@ -84,6 +89,9 @@ def process_phypayload(phypayload):
     else:
          LOGGER.info("*** Unsupported type: %d  (payload = %s)", mtype, binascii.hexlify(bin_data['phypayload']))
 
+    #random field (hash of the payload) when we have to select randomly packets
+    extra_infos['random'] = hashlib.sha3_256(bin_data['phypayload']).hexdigest()
+   
     #display_extra_infos(bin_data, extra_infos)
     return extra_infos
 

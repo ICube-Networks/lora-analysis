@@ -19,6 +19,9 @@ sys.path.insert(1, '../tools')
 # configuration parameters
 import myconfig
 
+# local libraries for the analysis
+import lorawan_dissector
+
 # json
 import json
 import flask 
@@ -285,8 +288,6 @@ class queries:
     CLUSTER_BUCKET_SIZE = 20000000      # max size of the bucket for agg queries (NB: all the existing devAddr possibly)
     DATE_START_DATASET = "2020-09-01"   # the date of the first correct packet in the dataset
 
-    #parameters
-    EXTRA_INFO_VERSION = "1.0"
 
     
     # fields extra_info exist for the frame
@@ -331,7 +332,7 @@ class queries:
     QUERY_NOEXTRAINFO_EXIST =  {
             "bool": {
                 "must_not": [
-                    {"term" :{ "extra_infos.version": EXTRA_INFO_VERSION }},
+                    {"term" :{ "extra_infos.version": lorawan_dissector.EXTRA_INFO_VERSION }},
                 ],
                 "must": [
                     {"match": {"txInfo.modulation.type": "LORA"}},

@@ -128,10 +128,11 @@ def es_query_get_devAddr():
     while True:
 
         try:
-            response = clientES.search(
+            response = clientES.options(
+                request_timeout=3000
+            ).search(
                 index=myconfig.index_name,
                 size=0,
-                request_timeout=3000,
                 pretty=True,
                 human=True,
                 query=tools.queries.QUERY_DATA,
