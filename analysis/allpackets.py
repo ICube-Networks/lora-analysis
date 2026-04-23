@@ -46,6 +46,7 @@ import pandas as pd
 #sys
 import sys, getopt
 import random
+import base64
 
 #logs
 import logging
@@ -54,6 +55,133 @@ logger.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout)
 
 
+# --------------------------------------------------------
+#       Packet sizes
+# --------------------------------------------------------
+      
+        
+def es_query_get_pkt_size():
+    """ Elastic query to get a list of the packet size
+     
+    :param clientES is an active connection to an elastic search server
+    
+    :returns: a list of all devAddrs
+    
+    :rtype: list of string
+    """
+
+    clientES = tools.elasticsearch_open_connection()
+
+
+    #Until we have no more doc
+    pagination_count = 0
+    list_pkt_size = []
+    minkey = 0
+    
+    while True:
+
+        try:
+            response = clientES.options(
+                request_timeout=3000
+            ).search(
+                index=myconfig.index_name,
+                size=tools.queries.QUERY_NB_RESULT,
+                pretty=True,
+                human=True,
+                query=tools.queries.QUERY_EXTRAINFO_EXIST_NODUP,
+                source = False,
+                fields=[
+                    "time",
+                    "phyPayload",
+                    "_id"
+                ],
+                sort=[#"phyPayload.keyword"], #random sort --> too slow!!
+                {
+                    "_script": {
+                        "type": "number",
+                        #index with a hash of the PHY + time (to have the same key each time)
+                        "script": "return(Math.abs(doc['phyPayload.keyword'].hashCode() + doc['time'].hashCode()));",
+                        "order": "asc",
+                    },
+                }],
+                search_after=[minkey],
+            )
+    
+        #exception in the ES query
+        except Exception as e:
+            print(e)
+            #print(e.message)
+            #print(e.meta)
+            #print(e.body)
+            exit(66)
+        
+        
+        #keep the next min key
+        length = len(response["hits"]["hits"])
+        minkey = response['hits']['hits'][length-1]['sort'][0]
+        
+        # for the next page
+        pagination_count = pagination_count + 1
+        print("page "+ str(pagination_count))
+        
+        # no more record
+        if (length == 0) or (pagination_count >= 50) :      #in the dataset 26,032 x 10,000 records...
+            logger.debug("Elastic search: last page for the aggregate query")
+            break;
+         
+        #transform the fields in a dataframe
+        df = pd.DataFrame.from_dict([document['fields'] for document in response['hits']['hits']])
+        
+        # convert the phyPayload field in hexa and divide the number of chars per 2 to have the length (in bytes)
+        tmp_df = df["phyPayload"].apply(
+            lambda x: (int)(len(base64.b64decode(x[0]).hex())/2)
+        )
+        #concatenate the new dataframe with the previous one (accumulation)
+        if 'pkt_size_df' in locals():
+            pkt_size_df = pd.concat([pkt_size_df, tmp_df], ignore_index=True)
+        else:
+            pkt_size_df = tmp_df
+        #print(pkt_size_df)
+            
+   
+    # end of extraction
+    logger.info("\t> Found " + str(pkt_size_df.count()) + " packets")
+   
+    #result
+    return(pkt_size_df)
+ 
+ 
+ 
+           
+def plot_pkt_size_cdf(pkt_size_df):
+    """ ECDF of the packet size
+        
+    :param distribution: a pandas dataframe with the size of all packets 
+    
+    """
+
+    sns.set()
+    sns.set_theme()
+    sns.set(font_scale=1)
+      
+    g = sns.ecdfplot(
+        pkt_size_df,
+        log_scale=False
+    )
+    plt.xlabel('Packet size (in bytes)', fontsize=12)
+    plt.ylabel('Cumulative Distribution', fontsize=12)
+
+        
+    #save figure
+    plt.tight_layout(pad=1.0, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/allpackets_pkt_size_ecdf.pdf")
+    g.figure.clf()
+    
+    exit(0)
+    
+    
+    
+    
 
 # --------------------------------------------------------
 #       Operators
@@ -214,6 +342,14 @@ if __name__ == "__main__":
     """
     
     
+        
+    # ----- packet size ---------
+    # distribution
+    pkt_size_df = es_query_get_pkt_size()
+    plot_pkt_size_cdf(pkt_size_df)
+    
+
+    
     # ----- operator ---------
     # distribution
     
@@ -231,9 +367,6 @@ if __name__ == "__main__":
 
     plot_operators_cdf(operators_df)
 
-
-    exit(0)
-    
     
 
     # ------- Traffic ---------
