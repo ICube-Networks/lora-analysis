@@ -109,11 +109,15 @@ if __name__ == "__main__":
 
         # reinit the next bulk update query
         bulk_update = []
-        LOGGER.info(response['hits']['hits'][0]['_id'])
-        LOGGER.info(response['hits']['hits'][0]['_source']['dup_infos']['dup_infos'])
-        LOGGER.info(response['hits']['hits'][0]['_source']['extra_infos'])
-        LOGGER.info("------")
-        
+        try:
+            LOGGER.info(response['hits']['hits'][0]['_id'])
+            LOGGER.info(response['hits']['hits'][0]['_source']['dup_infos']['copy_of'])
+            LOGGER.info(response['hits']['hits'][0]['_source']['extra_infos'])
+            LOGGER.info("------")
+        except (KeyError, AssertionError) as e:
+            LOGGER.info("Key error")
+            LOGGER.info("------")
+
         # one update per doc
         for num, doc in enumerate(response['hits']['hits']):
                     
