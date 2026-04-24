@@ -101,7 +101,7 @@ if __name__ == "__main__":
         length = len(response['hits']['hits'])
         #print("length:", length)
         if (length == 0):
-            LOGGER.info("No remaining entry without the right extra_infos field (version=" + queries.EXTRA_INFO_VERSION + ")")
+            LOGGER.info("No remaining entry without the right extra_infos field (version=" +  lorawan_dissector.EXTRA_INFO_VERSION + ")")
             break
         
         #extracts the mqtt-time of the last element to then scroll later
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 req_update['_index']         = myconfig.index_name
                 req_update['_id']            = doc['_id']
                 req_update['extra_infos']    = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
-                 #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+                LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
 
                 # insert this update to the current sequence
                 bulk_update.append(req_update)
@@ -152,11 +152,11 @@ if __name__ == "__main__":
         
         #push the update
         #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-        for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4):
+        for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4, refresh='wait_for'):
             action, result = result.popitem()
             
-            #print("action: ", action)
-            #print("result: ", result)
+            LOGGER.debug("action: ", action)
+            LOGGER.debug("result: ", result)
 
             if not okay:
                 LOGGER.error("Update failed: ", result["_id"])
@@ -164,7 +164,7 @@ if __name__ == "__main__":
          
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
-            LOGGER.info("No remaining entry without the right extra_infos field (version=" + queries.EXTRA_INFO_VERSION + ")")
+            LOGGER.info("No remaining entry without the right extra_infos field (version=" +  lorawan_dissector.EXTRA_INFO_VERSION + ")")
             LOGGER.info("Last bulk contained " + str(length) + " entries")
             break
 
