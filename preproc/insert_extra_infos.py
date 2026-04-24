@@ -94,6 +94,7 @@ if __name__ == "__main__":
             index=myconfig.index_name,
             size=tools.queries.QUERY_NB_RESULT,
             query=tools.queries.QUERY_NOEXTRAINFO_EXIST,
+            request_cache=False,
         )
 
         # num of records
