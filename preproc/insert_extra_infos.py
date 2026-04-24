@@ -109,8 +109,11 @@ if __name__ == "__main__":
 
         # reinit the next bulk update query
         bulk_update = []
-
-
+        LOGGER.info(response['hits']['hits'][0]['_id'])
+        LOGGER.info(response['hits']['hits'][0]['_source']['dup_infos']['dup_infos'])
+        LOGGER.info(response['hits']['hits'][0]['_source']['extra_infos'])
+        LOGGER.info("------")
+        
         # one update per doc
         for num, doc in enumerate(response['hits']['hits']):
                     
@@ -134,13 +137,14 @@ if __name__ == "__main__":
                 req_update = doc['_source']
                 req_update['_index']         = myconfig.index_name
                 req_update['_id']            = doc['_id']
-                req_update['extra_infos']   = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
+                req_update['extra_infos']    = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
                  #LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
 
                 # insert this update to the current sequence
                 bulk_update.append(req_update)
                 LOGGER.debug(bulk_update)
-                
+                    
+        
         #push the update
         #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
         for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4):
@@ -151,8 +155,8 @@ if __name__ == "__main__":
 
             if not okay:
                 LOGGER.error("Update failed: ", result["_id"])
-                
-            
+
+         
         #stops if we have less than QUERY_SIZE elements, it was the last response
         if (length < tools.queries.QUERY_NB_RESULT):
             LOGGER.info("No remaining entry without the right extra_infos field (version=" + queries.EXTRA_INFO_VERSION + ")")

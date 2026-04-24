@@ -50,6 +50,11 @@ def process_phypayload(phypayload):
     bin_data['mhdr'] = bin_data['phypayload'][0]
     bin_data['mic'] = bin_data['phypayload'][-4:]
 
+    #random field (hash of the payload) when we have to select randomly packets
+    extra_infos['random'] = hashlib.sha3_256(bin_data['phypayload']).hexdigest()
+    extra_infos['phyPayload']['length'] = len(bin_data['phypayload'])
+
+
     if len(bin_data['phypayload']) == 1 + len(bin_data['macPayload']) + len(bin_data['mic']):
         pass
     else:
@@ -58,12 +63,10 @@ def process_phypayload(phypayload):
 
     phypayload = bin_data['phypayload']
 
-
     #extra_infos['phyPayload']['bytes'] = binascii.hexlify(bin_data['phypayload'])
     extra_infos['phyPayload'].update(decode_mhdr(bin_data['mhdr']))
     extra_infos['phyPayload']['macPayload'] = {}
     extra_infos['phyPayload']['mic'] = binascii.hexlify(bin_data['mic']).decode()  #json compliant
-    extra_infos['phyPayload']['length'] = len(bin_data['phypayload'])
  
     mtype = extra_infos['phyPayload']['mhdr']['mType']
 
@@ -88,10 +91,7 @@ def process_phypayload(phypayload):
         extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
     else:
          LOGGER.info("*** Unsupported type: %d  (payload = %s)", mtype, binascii.hexlify(bin_data['phypayload']))
-
-    #random field (hash of the payload) when we have to select randomly packets
-    extra_infos['random'] = hashlib.sha3_256(bin_data['phypayload']).hexdigest()
-   
+    
     #display_extra_infos(bin_data, extra_infos)
     return extra_infos
 

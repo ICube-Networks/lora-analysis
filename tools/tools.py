@@ -302,6 +302,7 @@ class queries:
     """
     Query to match all the documents that have an extra_infos field.
     """
+    
     # fields extra_info exist for the frame
     QUERY_EXTRAINFO_EXIST_NODUP =  {
             "bool": {
@@ -320,12 +321,8 @@ class queries:
             #}]
             }
         }
-        
-
-        
-        
     """
-    Query to match all the documents that have an extra_infos field.
+    Query to match all the documents that have an extra_infos field, are data packets and are not duplicates.
     """
 
     # fields extra_info exist for the frame
