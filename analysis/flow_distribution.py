@@ -244,9 +244,67 @@ def plot_PRR_distrib(pd_all_flows):
     g.figure.clf()
          
 
+                
+def plot_SF_PRR_CDF(pd_all_flows):
+    """ Pairplot SF and PRR
+        
+    :param distribution: a pandas dataframe with the packets (SF / PRR)
+    
+    """
+    #pd_all_flows = pd_all_flows[pd_all_flows['nb_pkts'] >= 5000]
+    
+    
+    # extract for each flow the SF and PRR (mean values)
+    # NB: SF is mostly constant for a flow
+    values = []
+    for index, flow in pd_all_flows.iterrows():
+        pd_distrib = extract_interpacket_distribution.load_distribs_forDevAddr_and_time_1st_from_disk(flow['devAddr'],  flow['time_1st'])
+        record = {
+            'PRR' : 1 / pd_distrib['fCnt_diff'].mean(),
+            'SF' : round(pd_distrib['SF'].mean()),
+            'nb_pkts' : pd_distrib.size
+        }
+        values.append(record)
+        
+    # create the associated dataframe
+    pd_values = pd.DataFrame(values)
+    
+    sns.set()
+    sns.set_theme()
+    sns.set_theme(rc={'figure.figsize':(15,6)})
+    sns.set(font_scale=1.45)
+
+    #a grid of plots
+    fig, axs = plt.subplots(ncols=6, nrows=1)
+    
+    #live view of the distributions for each packet
+    for SF in range(7, 13):
+        pd_values_SF = pd_values[pd_values['SF'] == SF]
+        
+        g = sns.ecdfplot(
+                data=pd_values_SF,
+                x= 'PRR',
+                weights= 'nb_pkts',
+                ax=axs[SF-7]
+            )
+             
+        g.set_xticks([0, 0.5, 1])
+
+        if SF == 7:
+            g.set(xlabel="SF="+str(SF), ylabel='Cumulative Distribution Function \n of the Packet Reception Rate')
+        else:
+            g.set(xlabel="SF="+str(SF), ylabel='')
+            g.set(yticklabels=[])
+ 
+    plt.tight_layout(pad=0.8, h_pad=None, w_pad=None)
+    g.figure.savefig("figures/flow_SF_PRR_pairplot_CDF.pdf")
+    g.figure.clf()
+    
+    
+    
 
                 
-def plot_SF_PRR(pd_all_flows):
+def plot_SF_PRR_pairplot(pd_all_flows):
     """ Pairplot SF and PRR
         
     :param distribution: a pandas dataframe with the packets (SF / PRR)
@@ -436,7 +494,7 @@ if __name__ == "__main__":
     logger_flow.info("\t\t> removed "+ str(nb_records_minpkts - nb_records_maxfnctdiff) + " flows with a too high fnctdiff (>=" + str(FNCT_DIFF_MAX) + ")" )
     logger_flow.info("\t\t> "+ str(len(pd_all_flows)) + " flows to process")
 
-           
+  
     
     # --- plots per flow ---
     
@@ -444,7 +502,7 @@ if __name__ == "__main__":
     plot_PRR_distrib(pd_all_flows)
  
     #pairplot SF / PRR for all packets (flows are used to estimate the PRR)
-    plot_SF_PRR(pd_all_flows)
+    plot_SF_PRR_CDF(pd_all_flows)
     
     # correlation nb_dups / PRR
     plot_nbdups_prr(pd_all_flows)
