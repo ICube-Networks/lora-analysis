@@ -4,11 +4,17 @@
 
 # arguments verification
 usage() {
-    echo "Usage: $0 -d <directory to store the dumps>" 1>&2; exit 1;
+    echo "Usage: $0 -s <ES server name> -i <index_name> -d <directory to store the dumps>" 1>&2; exit 1;
 }
 
-while getopts ":d:" option; do
+while getopts ":s:i:d:" option; do
     case "${option}" in
+        s)
+            SERVER=${OPTARG}
+            ;;
+        i)
+            INDEX=${OPTARG}
+            ;;
         d)
             DIR_RESULT=${OPTARG}
             ;;
@@ -33,8 +39,8 @@ fi
 echo "Will store the dumps into ${DIR_RESULT}"
     
 #index
-INDEX=lora_gateway_rx_v4
-
+#INDEX=lora_gateway_rx_v4
+#SERVER=lora-es.icube.unistra.fr
 
 # years & months to process
 YEARS="2020 2021 2022 2023 2024 2025"
@@ -67,7 +73,7 @@ do
 
         # dump runnning the docker container
         docker run --name elasticdump --mount type=bind,source=${DIR_RESULT},target=/data --rm -ti elasticdump/elasticsearch-dump \
-            --input=http://lora-es.icube.unistra.fr:9200/`echo $INDEX` \
+            --input=http://`echo $SERVER`:9200/`echo $INDEX` \
             --output=/data/`echo $INDEX`_data_`echo $date`.json \
             --type=data --limit=10000 --debug=yes \
             --searchBody="{\"query\":{  \"range\": {\"time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
