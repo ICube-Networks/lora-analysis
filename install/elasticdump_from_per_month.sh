@@ -2,9 +2,12 @@
 # dump per month per year for the elastic dump index
 # installs a docker contained (elasticdump/elasticsearch-dump) for this purpose
 
+#default values
+DOCKER=0
+
 # arguments verification
 usage() {
-    echo "Usage: $0 -s <ES server name> -i <index_name> -d <directory to store the dumps>" 1>&2; exit 1;
+    echo "Usage: $0 -s <ES server name> -i <index_name> -d <directory to store the dumps> -docker <false by default>" 1>&2; exit 1;
 }
 
 while getopts ":s:i:d:" option; do
@@ -17,6 +20,9 @@ while getopts ":s:i:d:" option; do
             ;;
         d)
             DIR_RESULT=${OPTARG}
+            ;;
+        docker)
+            DOCKER=1
             ;;
         *)
             usage
@@ -47,8 +53,10 @@ YEARS="2020 2021 2022 2023 2024 2025"
 MONTHS="01 02 03 04 05 06 07 08 09 10 11 12"
 
 #remove previous container in case of failure
-docker container inspect elasticdump && docker rm elasticdump
-    
+if [ "$DOCKER" -eq 1 ]
+then
+    docker container inspect elasticdump && docker rm elasticdump
+fi
      
 # right location
 cd $DIR_RESULT
@@ -72,12 +80,22 @@ do
         echo ""
 
         # dump runnning the docker container
-        docker run --name elasticdump --mount type=bind,source=${DIR_RESULT},target=/data --rm -ti elasticdump/elasticsearch-dump \
+        if [ "$DOCKER" -eq 1 ]
+        then
+            docker run --name elasticdump --mount type=bind,source=${DIR_RESULT},target=/data --rm -ti elasticdump/elasticsearch-dump \
             --input=http://`echo $SERVER`:9200/`echo $INDEX` \
             --output=/data/`echo $INDEX`_data_`echo $date`.json \
             --type=data --limit=10000 --debug=yes \
             --searchBody="{\"query\":{  \"range\": {\"time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
 #            --searchBody="{\"query\":{  \"range\": {\"mqtt_time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
+        else
+            elasticdump \
+            --input=http://`echo $SERVER`:9200/`echo $INDEX` \
+            --output=/data/`echo $INDEX`_data_`echo $date`.json \
+            --type=data --limit=10000 --debug=yes \
+            --searchBody="{\"query\":{  \"range\": {\"time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
+        fi
+
 
         # I keep only the compressed version
         tar -czvf `echo $INDEX`_data_`echo $date`.json.tar.gz `echo $INDEX`_data_`echo $date`.json
