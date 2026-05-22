@@ -1,6 +1,9 @@
 #!/bin/bash
 # dump per month per year for the elastic dump index
-# installs a docker contained (elasticdump/elasticsearch-dump) for this purpose
+# -docker installs a docker contained (elasticdump/elasticsearch-dump) for this purpose
+
+# example: ./elasticdump_from_per_month.sh -s login:password@ES_server_name -i lora-strasbourg-anonymous -d /tmp/data
+
 
 #default values
 DOCKER=0
@@ -89,9 +92,14 @@ do
             --searchBody="{\"query\":{  \"range\": {\"time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
 #            --searchBody="{\"query\":{  \"range\": {\"mqtt_time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
         else
-            elasticdump \
-            --input=http://`echo $SERVER`:9200/`echo $INDEX` \
+        echo "elasticdump \
+            --input=https://`echo $SERVER`:9200/`echo $INDEX` \
             --output=/data/`echo $INDEX`_data_`echo $date`.json \
+            --type=data --limit=10000 --debug=yes         "
+            
+            NODE_TLS_REJECT_UNAUTHORIZED=0 elasticdump \
+            --input=https://`echo $SERVER`:9200/`echo $INDEX` \
+            --output=${DIR_RESULT}/`echo $INDEX`_data_`echo $date`.json \
             --type=data --limit=10000 --debug=yes \
             --searchBody="{\"query\":{  \"range\": {\"time\": {\"gte\": \"`echo $date`||/M\", \"lte\": \"`echo $date`||/M\"}}}}"
         fi
