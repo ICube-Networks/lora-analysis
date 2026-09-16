@@ -93,6 +93,7 @@ def es_query_get_pkt_size():
                 fields=[
                     "time",
                     "phyPayload",
+                    "extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword",
                     "_id"
                 ],
                 sort=[#"phyPayload.keyword"], #random sort --> too slow!!
@@ -132,10 +133,6 @@ def es_query_get_pkt_size():
         #transform the fields in a dataframe
         df = pd.DataFrame.from_dict([document['fields'] for document in response['hits']['hits']])
         
-        # convert the phyPayload field in hexa and divide the number of chars per 2 to have the length (in bytes)
-        tmp_df = df["phyPayload"].apply(
-            lambda x: (int)(len(base64.b64decode(x[0]).hex())/2)
-        )
         #concatenate the new dataframe with the previous one (accumulation)
         if 'pkt_size_df' in locals():
             pkt_size_df = pd.concat([pkt_size_df, tmp_df], ignore_index=True)
@@ -266,7 +263,7 @@ def plot_class_ack_distrib(data, fieldnames, figname):
         radius=1,
         colors=outer_colors,
         autopct=lambda pct: func(pct, values.sum(axis=1)),
-        pctdistance=0.85,
+        pctdistance=0.8,
         wedgeprops=dict(width=size,edgecolor='w')
         )
         
@@ -274,7 +271,7 @@ def plot_class_ack_distrib(data, fieldnames, figname):
     kw = dict(arrowprops=dict(arrowstyle="-"),
           bbox=bbox_props, zorder=0, va="center")
     
-    classes = ['class A', 'class B']
+    classes = ['class A or C', 'class B']
     for i, p in enumerate(wedges):
         ang = (p.theta2 - p.theta1)/2. + p.theta1
         y = np.sin(np.deg2rad(ang))
@@ -341,20 +338,36 @@ if __name__ == "__main__":
  
     """
     
-    
-        
-    # ----- packet size ---------
+    # ----- known operators ---------
+    operators = lorawan_operators.load_operators_csv()
+
+
+    #----- packet size ---------
     # distribution
     pkt_size_df = es_query_get_pkt_size()
-    plot_pkt_size_cdf(pkt_size_df)
+    # length
+    # convert the phyPayload field in hexa and divide the number of chars per 2 to have the length (in bytes)
+    pkt_size_df['pk_size'] = df["phyPayload"].apply(
+        lambda x: (int)(len(base64.b64decode(x[0]).hex())/2)
+    )
+    # operators
+    pkt_size_df['operator'] = pkt_size_df['devAddr'].apply(
+        lambda x: lorawan_operators.find_operators(operators, x)
+    )
+    # pckt size distrbution (global)
+    plot_pkt_size_cdf(pkt_size_df['pk_size'])
     
 
+    # aussi SF, etc;
+    # chercher plutôt des buckets count ?
+    # pk size à mettre à jour comme champ plutôt ?
     
-    # ----- operator ---------
+    
+    
+    # ----- operator list ---------
     # distribution
     
     #get all the devaddr and corresponding operators
-    operators = lorawan_operators.load_operators_csv()
     devaddr_df = extract_interpacket_distribution.es_query_get_devAddr()
     devaddr_df['operator'] = devaddr_df['devAddr'].apply(lambda x: lorawan_operators.find_operators(operators, x))
     

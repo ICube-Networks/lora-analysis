@@ -291,9 +291,9 @@ def plot_SF_PRR_CDF(pd_all_flows):
         g.set_xticks([0, 0.5, 1])
 
         if SF == 7:
-            g.set(xlabel="SF="+str(SF), ylabel='Cumulative Distribution Function \n of the Packet Reception Rate')
+            g.set(xlabel="PRR for SF="+str(SF), ylabel='Cumulative Distribution Function \n of the Packet Reception Rate')
         else:
-            g.set(xlabel="SF="+str(SF), ylabel='')
+            g.set(xlabel="PRR for SF="+str(SF), ylabel='')
             g.set(yticklabels=[])
  
     plt.tight_layout(pad=0.8, h_pad=None, w_pad=None)
