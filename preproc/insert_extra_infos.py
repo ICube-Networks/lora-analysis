@@ -52,10 +52,9 @@ import logging
 LOGGER = logging.getLogger('dataset_decodeFrames')
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
+import cProfile
+        
 logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
-
-
-
 
 
 
@@ -65,6 +64,93 @@ logging.getLogger('elastic_transport.transport').setLevel(logging.INFO)
 #   SEARCH for records without extra_infos to update them
 ############################################################
 
+
+def scroll_elastisearch_docs(clientES):
+    counter = 0
+
+    #search records without the right extra info version
+    response = clientES.options(
+        basic_auth=(myconfig.user, myconfig.password),
+    ).search(
+        index=myconfig.index_name,
+        size=tools.queries.QUERY_NB_RESULT,
+        query=tools.queries.QUERY_NOEXTRAINFO_EXIST,
+        request_cache=False,
+    )
+
+    # num of records
+    length = len(response['hits']['hits'])
+    #print("length:", length)
+    if (length == 0):
+        LOGGER.info("No remaining entry without the right extra_infos field (version=" +  lorawan_dissector.EXTRA_INFO_VERSION + ")")
+        return
+    
+    #extracts the mqtt-time of the last element to then scroll later
+    #last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
+    LOGGER.info("       > " + str(length) + " records")
+
+    # reinit the next bulk update query
+    bulk_update = []
+    try:
+        LOGGER.debug(response['hits']['hits'][0]['_id'])
+        LOGGER.debug(response['hits']['hits'][0]['_source']['dup_infos']['copy_of'])
+        LOGGER.debug(response['hits']['hits'][0]['_source']['extra_infos'])
+        LOGGER.debug("------")
+    except (KeyError, AssertionError) as e:
+        LOGGER.error("Key error")
+        LOGGER.error("------")
+
+    # one update per doc
+    for num, doc in enumerate(response['hits']['hits']):
+        counter = counter + 1
+        
+        # has this record already extra info with the right info?
+        try:
+            assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.EXTRA_INFO_VERSION)
+            
+        except (KeyError, AssertionError) as e:
+            #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
+            #LOGGER.info(json.dumps(doc, sort_keys=True, indent=4))
+
+            #we MUST have phyPayload
+            if not doc.__contains__('_source') or not doc['_source'].__contains__('phyPayload'):
+                LOGGER.error("** Decoding the Loraframe: The doc has no phyPayload")
+                LOGGER.error(json.dumps(doc, sort_keys=True, indent=4))
+                print(doc.__contains__('_source'))
+                print(doc['_source'].__contains__('phyPayload'))
+                exit(2)
+              
+            #construct the next update for this id (decoding the LoRa frame)
+            req_update = doc['_source']
+            req_update['_index']         = myconfig.index_name
+            req_update['_id']            = doc['_id']
+            req_update['extra_infos']    = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
+               
+            # insert this update to the current sequence
+            LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
+            bulk_update.append(req_update)
+            #LOGGER.debug(bulk_update)
+                
+    print("------")
+    
+    #push the update
+    #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
+    for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=2500, thread_count=4, refresh='wait_for'):
+        action, result = result.popitem()
+        
+        LOGGER.debug("action: ", action)
+        LOGGER.debug("result: ", result)
+
+        if not okay:
+            LOGGER.error("Update failed: ", result["_id"])
+
+    exit(0)
+    
+    #stops if we have less than QUERY_SIZE elements, it was the last response
+    if (length < tools.queries.QUERY_NB_RESULT):
+        LOGGER.info("No remaining entry without the right extra_infos field (version=" +  lorawan_dissector.EXTRA_INFO_VERSION + ")")
+        LOGGER.info("Last bulk contained " + str(length) + " entries")
+        return
 
 
 # executable
@@ -85,89 +171,11 @@ if __name__ == "__main__":
     clientES = tools.elasticsearch_open_connection()
 
     # Scroll all the documents of the elastic search index
-    datemin="0"
     LOGGER.info("Start scrolling the records")
+    counter = 0
     while True:
-        #search records without the right extra info version
-        response = clientES.options(
-            basic_auth=(myconfig.user, myconfig.password),
-        ).search(
-            index=myconfig.index_name,
-            size=tools.queries.QUERY_NB_RESULT,
-            query=tools.queries.QUERY_NOEXTRAINFO_EXIST,
-            request_cache=False,
-        )
-
-        # num of records
-        length = len(response['hits']['hits'])
-        #print("length:", length)
-        if (length == 0):
-            LOGGER.info("No remaining entry without the right extra_infos field (version=" +  lorawan_dissector.EXTRA_INFO_VERSION + ")")
-            break
-        
-        #extracts the mqtt-time of the last element to then scroll later
-        #last_record = datetime.strptime(response['hits']['hits'][length-1]['_source']['time'], tools.time.DATE_FORMAT_ELASTICSEARCH)
-        LOGGER.info("       > " + str(length) + " records")
-
-        # reinit the next bulk update query
-        bulk_update = []
-        try:
-            LOGGER.debug(response['hits']['hits'][0]['_id'])
-            LOGGER.debug(response['hits']['hits'][0]['_source']['dup_infos']['copy_of'])
-            LOGGER.debug(response['hits']['hits'][0]['_source']['extra_infos'])
-            LOGGER.debug("------")
-        except (KeyError, AssertionError) as e:
-            LOGGER.error("Key error")
-            LOGGER.error("------")
-
-        # one update per doc
-        for num, doc in enumerate(response['hits']['hits']):
-                    
-            # has this record already extra info with the right info?
-            try:
-                assert(doc['_source']['extra_infos']['version'] == lorawan_dissector.EXTRA_INFO_VERSION)
-                
-            except (KeyError, AssertionError) as e:
-                #LOGGER.info("** Decoding the Loraframe: The doc has no phyPayload")
-                #LOGGER.info(json.dumps(doc, sort_keys=True, indent=4))
-
-                #we MUST have phyPayload
-                if not doc.__contains__('_source') or not doc['_source'].__contains__('phyPayload'):
-                    LOGGER.error("** Decoding the Loraframe: The doc has no phyPayload")
-                    LOGGER.error(json.dumps(doc, sort_keys=True, indent=4))
-                    print(doc.__contains__('_source'))
-                    print(doc['_source'].__contains__('phyPayload'))
-                    exit(2)
-                  
-                #construct the next update for this id (decoding the LoRa frame)
-                req_update = doc['_source']
-                req_update['_index']         = myconfig.index_name
-                req_update['_id']            = doc['_id']
-                req_update['extra_infos']    = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
-                   
-                # insert this update to the current sequence
-                LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
-                bulk_update.append(req_update)
-                LOGGER.debug(bulk_update)
-                    
-        
-        #push the update
-        #for okay, result in streaming_bulk(client=clientES_bulk, actions=bulk_update):
-        for okay, result in parallel_bulk(client=clientES, actions=bulk_update, chunk_size=10000, thread_count=4, refresh='wait_for'):
-            action, result = result.popitem()
-            
-            LOGGER.debug("action: ", action)
-            LOGGER.debug("result: ", result)
-
-            if not okay:
-                LOGGER.error("Update failed: ", result["_id"])
-
-         
-        #stops if we have less than QUERY_SIZE elements, it was the last response
-        if (length < tools.queries.QUERY_NB_RESULT):
-            LOGGER.info("No remaining entry without the right extra_infos field (version=" +  lorawan_dissector.EXTRA_INFO_VERSION + ")")
-            LOGGER.info("Last bulk contained " + str(length) + " entries")
-            break
+        scroll_elastisearch_docs(clientES)
+        #cProfile.run('scroll_elastisearch_docs(clientES)')
 
 
     clientES.transport.close()
