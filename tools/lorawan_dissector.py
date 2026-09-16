@@ -14,8 +14,12 @@ import pprint
 #hash
 import hashlib
 
+#to decode operators
+import lorawan_operators
+
+
 #parameters
-EXTRA_INFO_VERSION = "1.1"
+EXTRA_INFO_VERSION = "1.111"
 
 
 MTYPE_JOIN_REQUEST = 0
@@ -91,6 +95,14 @@ def process_phypayload(phypayload):
         extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
     else:
          LOGGER.info("*** Unsupported type: %d  (payload = %s)", mtype, binascii.hexlify(bin_data['phypayload']))
+    
+    #operator for this devaddr
+    operators = lorawan_operators.load_operators_csv()
+    try:
+        extra_infos['operator'] = lorawan_operators.find_operators(operators, extra_infos['phyPayload']['macPayload']['fhdr']['devAddr'])
+    except (KeyError) as e:
+        LOGGER.debug("no devAddr for this record")
+          
     
     #display_extra_infos(bin_data, extra_infos)
     return extra_infos

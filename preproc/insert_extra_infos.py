@@ -30,7 +30,7 @@ from elasticsearch.helpers import parallel_bulk
 # configuration parameters
 import myconfig
 
-# dissector of LoRaWAN frames
+# dissector and tools for LoRaWAN frames
 import lorawan_dissector
 
 # my tool functions in common for the analysis
@@ -45,6 +45,7 @@ import numpy as np
 import requests, json, os, tarfile, pathlib
 from datetime import datetime
 import matplotlib.dates as mdates
+import base64
 
 #logs
 import logging
@@ -111,13 +112,13 @@ if __name__ == "__main__":
         # reinit the next bulk update query
         bulk_update = []
         try:
-            LOGGER.info(response['hits']['hits'][0]['_id'])
-            LOGGER.info(response['hits']['hits'][0]['_source']['dup_infos']['copy_of'])
-            LOGGER.info(response['hits']['hits'][0]['_source']['extra_infos'])
-            LOGGER.info("------")
+            LOGGER.debug(response['hits']['hits'][0]['_id'])
+            LOGGER.debug(response['hits']['hits'][0]['_source']['dup_infos']['copy_of'])
+            LOGGER.debug(response['hits']['hits'][0]['_source']['extra_infos'])
+            LOGGER.debug("------")
         except (KeyError, AssertionError) as e:
-            LOGGER.info("Key error")
-            LOGGER.info("------")
+            LOGGER.error("Key error")
+            LOGGER.error("------")
 
         # one update per doc
         for num, doc in enumerate(response['hits']['hits']):
@@ -143,9 +144,10 @@ if __name__ == "__main__":
                 req_update['_index']         = myconfig.index_name
                 req_update['_id']            = doc['_id']
                 req_update['extra_infos']    = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
-                LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
-
+                print(req_update['extra_infos'])
+                 
                 # insert this update to the current sequence
+                LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
                 bulk_update.append(req_update)
                 LOGGER.debug(bulk_update)
                     

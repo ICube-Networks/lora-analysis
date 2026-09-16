@@ -94,17 +94,18 @@ def es_query_get_pkt_size():
                     "time",
                     "phyPayload",
                     "extra_infos.phyPayload.macPayload.fhdr.devAddr.keyword",
-                    "_id"
+                    "_id",
+                    "extra_infos.random"
                 ],
-                sort=[#"phyPayload.keyword"], #random sort --> too slow!!
-                {
-                    "_script": {
-                        "type": "number",
-                        #index with a hash of the PHY + time (to have the same key each time)
-                        "script": "return(Math.abs(doc['phyPayload.keyword'].hashCode() + doc['time'].hashCode()));",
-                        "order": "asc",
-                    },
-                }],
+                sort=[extra_infos.random], #use the random field to avoid scripted queries (too slow)
+                #{
+                #    "_script": {
+                #        "type": "number",
+                #        #index with a hash of the PHY + time (to have the same key each time)
+                #        "script": "return(Math.abs(doc['phyPayload.keyword'].hashCode() + doc['time'].hashCode()));",
+                #        "order": "asc",
+                #    },
+                #}],
                 search_after=[minkey],
             )
     
