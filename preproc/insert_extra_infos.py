@@ -144,8 +144,7 @@ if __name__ == "__main__":
                 req_update['_index']         = myconfig.index_name
                 req_update['_id']            = doc['_id']
                 req_update['extra_infos']    = lorawan_dissector.process_phypayload(doc['_source']['phyPayload'])
-                print(req_update['extra_infos'])
-                 
+                   
                 # insert this update to the current sequence
                 LOGGER.debug(json.dumps(req_update, sort_keys=True, indent=4))
                 bulk_update.append(req_update)
