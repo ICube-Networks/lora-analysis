@@ -33,6 +33,7 @@ MTYPE_PROPRIETARY = 7
 
 LOGGER = logging.getLogger('phypayload_dissector')
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+operators = lorawan_operators.load_operators_csv()
 
 def get_mtype(byte):
     """ return MType from MHDR """
@@ -95,14 +96,12 @@ def process_phypayload(phypayload):
         extra_infos['phyPayload'].update(decode_data_generic(bin_data, mtype))
     else:
          LOGGER.info("*** Unsupported type: %d  (payload = %s)", mtype, binascii.hexlify(bin_data['phypayload']))
-    
+
     #operator for this devaddr
-    operators = lorawan_operators.load_operators_csv()
     try:
-        extra_infos['operator'] = lorawan_operators.find_operators(operators, extra_infos['phyPayload']['macPayload']['fhdr']['devAddr'])
+         extra_infos['operator'] = lorawan_operators.find_operators(operators, extra_infos['phyPayload']['macPayload']['fhdr']['devAddr'])
     except (KeyError) as e:
-        LOGGER.debug("no devAddr for this record")
-          
+        LOGGER.info("no devAddr for this record")
     
     #display_extra_infos(bin_data, extra_infos)
     return extra_infos

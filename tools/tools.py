@@ -195,12 +195,14 @@ def elasticsearch_query_count_docs_with_twofields(fieldnames):
         aggs={
             fieldnames['fieldname1']:{
                 "terms": {
-                    "field": fieldnames['fieldname1']
+                    "field": fieldnames['fieldname1'],
+                    "size": 1000
                 },
                 "aggs":{
                     fieldnames['fieldname2']:{
                         "terms" :{
-                            "field" : fieldnames['fieldname2']
+                            "field" : fieldnames['fieldname2'],
+                            "size": 1000
                         }
                     }
                 }
@@ -315,10 +317,10 @@ class queries:
               #"must" : [{
               #  "range": {
               #      "time": {
-              #            "gte": "2025-06-10T09:40:19.485088Z",
+              #            "gte": "2025-07-10T09:40:19.485088Z",
               #      }
               #  }
-            #}]
+              #}]
             }
         }
     """
@@ -470,9 +472,11 @@ class queries:
                 ]
             }
         }
-    """
-    Query to match any document corresponding to a correctly received LoRa frame.
-    """
+
+
+
+
+
 
 ############################################################
 #           ELASTIC SEARCH
